@@ -15,11 +15,11 @@ public static class MirageWindowDefaults
         ArgumentNullException.ThrowIfNull(window);
 
         window.Size = DefaultSize;
-        window.SizeCondition = ImGuiCond.FirstUseEver;
+        window.SizeCondition = Resizable ? ImGuiCond.FirstUseEver : ImGuiCond.Always;
         window.SizeConstraints = new()
         {
             MinimumSize = DefaultSize,
-            MaximumSize = MaximumSize,
+            MaximumSize = Resizable ? MaximumSize : DefaultSize,
         };
 
         if (!Resizable)
