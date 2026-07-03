@@ -14,6 +14,7 @@ global using static MirageUI.Ui.MirageLayout;  // Style, Cursor 等
 - [初期化](#初期化)
 - [公開 API 一覧](#公開-api-一覧)
 - [MirageUi](#mirageui)
+- [MirageWindowDefaults](#miragewindowdefaults)
 - [MirageUi.TwoColumn](#mirageuitwocolumn)
 - [MirageTheme](#miragetheme)
 - [MirageLayout](#miragelayout)
@@ -59,6 +60,7 @@ public override void PostDraw() => MirageTheme.Pop(_colorScope);
 | 型 | 説明 |
 | --- | --- |
 | `MirageUi` | UI 描画ヘルパー |
+| `MirageWindowDefaults` | 2 カラムウィンドウの既定サイズ・リサイズ可否 |
 | `MirageTheme` | テーマ（配色）管理 |
 | `MirageColorSettings` | テーマ配色設定 |
 | `MirageColorSettingsJson` | 配色 JSON 入出力 |
@@ -105,6 +107,28 @@ MirageUi.Image(path, width, height, isCircle: true);
 | `MatchesFilter(key, label, filter)` | エントリの絞り込み判定 |
 | `OverlayFill(screenPos, size, rounding, flags)` | 背景塗りつぶし |
 | `PushFont(FontSize)` | `Default` / `Large` フォントの切り替え |
+
+## MirageWindowDefaults
+
+2 カラムレイアウト用 Dalamud `Window` の既定サイズとリサイズ可否。
+
+| メンバー | 既定値 | 説明 |
+| --- | --- | --- |
+| `DefaultSize` | `(900, 630)` | 初回表示時のウィンドウサイズ |
+| `MaximumSize` | `(4096, 2160)` | リサイズ時の上限（`Resizable = true` のとき） |
+| `Resizable` | `false` | `false` で `ImGuiWindowFlags.NoResize` を付与 |
+
+```csharp
+using Dalamud.Interface.Windowing;
+
+public sealed class MyWindow : Window
+{
+    public MyWindow() : base("My Plugin###MyPlugin_Main")
+    {
+        MirageWindowDefaults.ApplyTo(this);
+    }
+}
+```
 
 ## MirageUi.TwoColumn
 
