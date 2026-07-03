@@ -108,6 +108,21 @@ public static partial class MirageUi
         }
     }
 
+    /// <summary>チェックボックス。</summary>
+    public static bool Checkbox(string label, ref bool value) =>
+        ImGui.Checkbox(label, ref value);
+
+    /// <summary>
+    /// チェックボックスの直下から <see cref="CheckboxGroupScope"/> の Dispose までをインデントする。
+    /// 説明文や子コントロールは <c>using</c> ブロック内に描画する。
+    /// </summary>
+    public static CheckboxGroupScope CheckboxGroup(string label, ref bool value)
+    {
+        var changed = ImGui.Checkbox(label, ref value);
+        ImGui.Indent();
+        return new CheckboxGroupScope(changed);
+    }
+
     /// <summary>本文。<paramref name="color"/> は <see cref="Color"/> または Vector4。</summary>
     public static void Text(
         string text,
