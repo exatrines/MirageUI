@@ -119,6 +119,8 @@ internal static class TwoColumnLayout
 
         var listHeight = Math.Max(0f, listBottom - listTop);
         var topSearchY = headerHeight;
+        if (topSearchHeight > 0f && headerHeight <= 0f)
+            topSearchY = windowPadding.Y;
         var bottomSearchY = contentHeight - footerHeight - bottomSearchHeight;
         var footerY = contentHeight - footerHeight;
 
