@@ -64,6 +64,8 @@ public override void PostDraw() => MirageTheme.Pop(_colorScope);
 | `MirageTheme` | テーマ（配色）管理 |
 | `MirageColorSettings` | テーマ配色設定 |
 | `MirageColorSettingsJson` | 配色 JSON 入出力 |
+| `MirageMessageState` | Message ダイアログ状態 |
+| `MirageMessageButton` | Message ダイアログボタン |
 | `MirageTwoColumnState` | 2 カラムレイアウトの状態 |
 | `MirageTwoColumnEntry` | 左カラムのリスト項目 |
 | `MirageTwoColumnSidebarHeader` | 左カラムのプラグイン情報 |
@@ -78,12 +80,17 @@ public override void PostDraw() => MirageTheme.Pop(_colorScope);
 | --- | --- | --- | --- | --- |
 | `Header` | 大見出し | `Color.Title` | `FontSize.Large` | `true` |
 | `HeaderWithBool` | 右端 ON/OFF 付き見出し | `Color.Title` | `FontSize.Large` | `true` |
+| `HeaderWithRunToggle` | 右端 Start/Stop トグル付き見出し | `Color.Title` | `FontSize.Large` | `true` |
 | `SubHeader` | 小見出し | `Color.Title` | `FontSize.Default` | `true` |
 | `Text` | 本文 | `Color.Default` | `FontSize.Default` | `false` |
 
 ```csharp
 MirageUi.Header("タイトル");
 MirageUi.HeaderWithBool("機能名", true, trueText: "ON", falseText: "OFF");
+if (MirageUi.HeaderWithRunToggle("Auto Tribe", isRunning))
+{
+    // Start or Stop clicked
+}
 MirageUi.SubHeader("設定");
 MirageUi.Text("説明文", color: MirageUi.Color.Secondary);
 ```
@@ -97,6 +104,87 @@ MirageUi.Image(path, width, height, isCircle: true);
 ```
 
 ローカルファイルパスの画像を表示する。テクスチャ未ロード時は `false` を返す。
+
+### Message
+
+中央モーダル。`bool` / `MirageMessageState.Visible` で表示切替。ウィンドウ全体に半透明グレーをかぶせ、その上にメッセージを表示する。
+
+```csharp
+var message = new MirageMessageState();
+
+// 表示
+message.Show(
+    "Confirm",
+    "Run Auto Tribe now?",
+    FontAwesomeIcon.QuestionCircle,
+    new MirageMessageButton { Label = "Cancel" },
+    new MirageMessageButton { Label = "OK", Primary = true, OnClick = Start });
+
+// ホストウィンドウ Draw の末尾
+MirageUi.Message.Draw(message);
+
+// または
+MirageUi.Message.Draw(ref visible, "Title", "Body", FontAwesomeIcon.InfoCircle,
+    new MirageMessageButton { Label = "OK", Primary = true, OnClick = () => { } });
+```
+
+| API | 説明 |
+| --- | --- |
+| `Message.Draw(state)` | State の Visible で表示 |
+| `Message.Draw(ref visible, title, message, icon, buttons)` | bool で表示 |
+| `MirageMessageButton` | ラベル / OnClick / Primary / CloseOnClick（最大 3） |
+
+### Button
+
+Accent-styled action button. `Primary` is filled stronger; `Secondary` is lighter.
+
+```csharp
+if (MirageUi.PrimaryButton("Change Gearset", enabled: selected >= 0))
+{
+    // clicked
+}
+
+if (MirageUi.SecondaryButton("Cancel"))
+{
+}
+
+if (MirageUi.Button("Save", MirageUi.ButtonKind.Primary, width: 120f))
+{
+}
+```
+
+| API | Description |
+| --- | --- |
+| `Button(label, kind, ...)` | Primary / Secondary |
+| `PrimaryButton` / `SecondaryButton` | Shortcuts |
+| `width` | `0` = auto size; `> 0` = fixed width |
+
+### Dropdown
+
+
+アクセントカラーのプルダウン。レイアウトは `[プルダウン] [項目名]`（開いているあいだも項目名はコンボ横に表示し、リスト内には出さない）。既定幅は右ページ内容幅の半分（左余白込みで右ページ約半分）。
+
+```csharp
+var selected = "Paladin";
+if (MirageUi.Dropdown("Battle", ref selected, gearsetNames, placeholder: "(not set)"))
+{
+    // 選択変更
+}
+
+// カスタム項目
+if (MirageUi.BeginDropdown("Job", preview, id: "job", hasValue: true))
+{
+    if (MirageUi.DropdownItem("Paladin", selected == "Paladin"))
+        selected = "Paladin";
+    MirageUi.EndDropdown();
+}
+```
+
+| API | 説明 |
+| --- | --- |
+| `Dropdown(label, ref selected, items, ...)` | 文字列リストのプルダウン |
+| `BeginDropdown` / `EndDropdown` | カスタム項目用 |
+| `DropdownItem(label, selected)` | 項目（選択中はフォーカス） |
 
 ### その他
 

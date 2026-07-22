@@ -52,7 +52,7 @@ public static partial class MirageUi
             PaddedSeparator();
     }
 
-    /// <summary>右端に ON/OFF 等のステータスを表示する見出し + 下線。</summary>
+    /// <summary>Title with trailing On/Off status + underline.</summary>
     public static void HeaderWithBool(
         string title,
         bool value,
@@ -84,7 +84,62 @@ public static partial class MirageUi
             PaddedSeparator();
     }
 
-    /// <summary>設定画面内の見出し + 下線。</summary>
+    /// <summary>
+    /// Title with a single Start/Stop toggle on the right.
+    /// Returns true when the toggle was clicked.
+    /// </summary>
+    public static bool HeaderWithRunToggle(
+        string title,
+        bool isRunning,
+        string startText = "Start",
+        string stopText = "Stop",
+        Color color = Color.Title,
+        FontSize fontSize = FontSize.Large,
+        bool underline = true,
+        string id = "header-run")
+    {
+        var scale = MirageLayout.Style.Scale;
+        MirageLayout.Cursor.Y += 5f * scale;
+
+        var startCursor = MirageLayout.Cursor.Position;
+        float titleHeight;
+        using (PushFont(fontSize))
+        {
+            DrawText(title, GetColor(color), wrap: false);
+            titleHeight = ImGui.GetItemRectSize().Y;
+        }
+
+        var buttonLabel = isRunning ? stopText : startText;
+        var framePadding = MirageLayout.Style.FramePadding;
+        var buttonPadding = new Vector2(
+            framePadding.X + ButtonExtraPaddingX,
+            framePadding.Y + ButtonExtraPaddingY);
+        Vector2 labelSize;
+        using (PushFont(FontSize.Default))
+            labelSize = ImGui.CalcTextSize(buttonLabel);
+
+        var buttonSize = new Vector2(
+            labelSize.X + buttonPadding.X * 2f,
+            labelSize.Y + buttonPadding.Y * 2f);
+        var buttonX = MirageLayout.Style.ContentRegionMax.X - buttonSize.X;
+        var buttonY = startCursor.Y + MathF.Max(0f, (titleHeight - buttonSize.Y) * 0.5f);
+        MirageLayout.Cursor.Position = new Vector2(buttonX, buttonY);
+
+        var clicked = isRunning
+            ? SecondaryButton(buttonLabel, id: id)
+            : PrimaryButton(buttonLabel, id: id);
+
+        // Keep layout flow below the taller of title / button.
+        var rowBottom = startCursor.Y + MathF.Max(titleHeight, buttonSize.Y);
+        MirageLayout.Cursor.Position = new Vector2(startCursor.X, rowBottom);
+
+        if (underline)
+            PaddedSeparator();
+
+        return clicked;
+    }
+
+    /// <summary>Section heading inside settings + underline.</summary>
     public static void SubHeader(
         string label,
         bool pushDown = true,

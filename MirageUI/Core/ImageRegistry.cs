@@ -30,6 +30,23 @@ internal static class ImageRegistry
         return true;
     }
 
+    internal static bool TryGetGameIcon(uint iconId, bool hiRes, out IDalamudTextureWrap wrap)
+    {
+        wrap = null!;
+        if (_textureProvider == null || iconId == 0)
+            return false;
+
+        var key = $"gameicon:{iconId}:{(hiRes ? "hr" : "lr")}";
+        var shared = Textures.GetOrAdd(key, _ =>
+            _textureProvider.GetFromGameIcon(new GameIconLookup(iconId, itemHq: false, hiRes: hiRes)));
+        var texture = shared.GetWrapOrDefault();
+        if (texture == null)
+            return false;
+
+        wrap = texture;
+        return true;
+    }
+
     internal static void Dispose()
     {
         Textures.Clear();

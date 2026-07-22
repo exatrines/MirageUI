@@ -50,8 +50,7 @@ internal static class TwoColumnLayout
                 sidebarWidth,
                 scale,
                 layout.ListHeight,
-                layout.HasSearch,
-                state.ShowEntryToggle);
+                layout.HasSearch);
 
             if (layout.BottomSearchHeight > 0f)
             {
@@ -390,10 +389,10 @@ internal static class TwoColumnLayout
 
         state.SearchFilter = searchFilter;
 
-        var visible = GetVisibleEntries(state, hasSearch: true).ToList();
+        var firstEntry = GetFirstVisibleEntry(state);
         var nextId = string.IsNullOrWhiteSpace(state.SearchFilter)
             ? null
-            : visible.Count > 0 ? visible[0].Entry.Id : null;
+            : firstEntry?.Id;
         state.SelectedId = nextId;
         state.OnSelectionChanged?.Invoke(nextId ?? string.Empty);
     }
@@ -403,8 +402,7 @@ internal static class TwoColumnLayout
         float sidebarWidth,
         float scale,
         float listHeight,
-        bool hasSearch,
-        bool showEntryToggle)
+        bool hasSearch)
     {
         var windowPadding = state.SidebarPadding * scale;
 
@@ -419,8 +417,149 @@ internal static class TwoColumnLayout
 
         using var spacingStyle = ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, Vector2.Zero);
 
+        if (UsesGroupedSidebar(state))
+        {
+            foreach (var node in GetVisibleSidebarNodes(state, hasSearch))
+                DrawSidebarNode(state, node, scale);
+            return;
+        }
+
         foreach (var (_, entry) in GetVisibleEntries(state, hasSearch))
-            DrawListItem(state, entry, showEntryToggle);
+            DrawListItem(state, entry);
+    }
+
+    private static bool UsesGroupedSidebar(MirageTwoColumnState state) =>
+        state.SidebarNodes.Count > 0;
+
+    private static void DrawSidebarNode(
+        MirageTwoColumnState state,
+        MirageTwoColumnSidebarNode node,
+        float scale)
+    {
+        switch (node)
+        {
+            case MirageTwoColumnPageNode page:
+                DrawListItem(state, page.Entry);
+                break;
+            case MirageTwoColumnFolderNode folder:
+                DrawFolderNode(state, folder, scale);
+                break;
+        }
+    }
+
+    private static void DrawFolderNode(
+        MirageTwoColumnState state,
+        MirageTwoColumnFolderNode folder,
+        float scale)
+    {
+        using var folderId = ImRaii.PushId(folder.Id);
+
+        var rowStartY = MirageLayout.Cursor.Y;
+        var rowHeight = MirageLayout.Style.FrameHeight;
+        var forceExpanded = HasActiveSearch(state);
+        var expanded = forceExpanded || !state.CollapsedFolderIds.Contains(folder.Id);
+
+        ImGui.AlignTextToFramePadding();
+        if (ListSelectable.DrawFolderHeader(folder.Label, expanded, rowHeight))
+        {
+            if (expanded && !forceExpanded)
+                state.CollapsedFolderIds.Add(folder.Id);
+            else
+                state.CollapsedFolderIds.Remove(folder.Id);
+        }
+
+        MirageLayout.Cursor.Y = rowStartY + rowHeight + state.ItemSpacing * scale;
+
+        if (!expanded)
+            return;
+
+        var indent = state.FolderPageIndent * scale;
+        foreach (var entry in folder.Entries)
+            DrawListItem(state, entry, indent);
+    }
+
+    private static bool HasActiveSearch(MirageTwoColumnState state) =>
+        state.ShowSearch && !string.IsNullOrWhiteSpace(state.SearchFilter);
+
+    private static IEnumerable<MirageTwoColumnSidebarNode> GetVisibleSidebarNodes(
+        MirageTwoColumnState state,
+        bool hasSearch)
+    {
+        foreach (var node in state.SidebarNodes)
+        {
+            switch (node)
+            {
+                case MirageTwoColumnPageNode page:
+                    if (!IsEntryVisible(state, hasSearch, page.Entry))
+                        continue;
+
+                    yield return page;
+                    break;
+                case MirageTwoColumnFolderNode folder:
+                    if (!IsFolderVisible(state, hasSearch, folder))
+                        continue;
+
+                    if (!hasSearch || string.IsNullOrWhiteSpace(state.SearchFilter))
+                    {
+                        yield return folder;
+                        break;
+                    }
+
+                    var matchingEntries = folder.Entries
+                        .Where(entry => IsEntryVisible(state, hasSearch: true, entry))
+                        .ToList();
+                    if (matchingEntries.Count == 0)
+                        break;
+
+                    yield return new MirageTwoColumnFolderNode
+                    {
+                        Id = folder.Id,
+                        Label = folder.Label,
+                        Entries = matchingEntries,
+                    };
+                    break;
+            }
+        }
+    }
+
+    private static bool IsFolderVisible(MirageTwoColumnState state, bool hasSearch, MirageTwoColumnFolderNode folder)
+    {
+        if (!hasSearch || string.IsNullOrWhiteSpace(state.SearchFilter))
+            return folder.Entries.Count > 0;
+
+        if (MirageUi.MatchesFilter(folder.Id, folder.Label, state.SearchFilter))
+            return true;
+
+        return folder.Entries.Any(entry => IsEntryVisible(state, hasSearch: true, entry));
+    }
+
+    private static bool IsEntryVisible(MirageTwoColumnState state, bool hasSearch, MirageTwoColumnEntry entry)
+    {
+        if (!hasSearch || string.IsNullOrWhiteSpace(state.SearchFilter))
+            return true;
+
+        return MirageUi.MatchesFilter(entry.Id, entry.Label, state.SearchFilter);
+    }
+
+    private static MirageTwoColumnEntry? GetFirstVisibleEntry(MirageTwoColumnState state)
+    {
+        if (UsesGroupedSidebar(state))
+        {
+            foreach (var node in GetVisibleSidebarNodes(state, state.ShowSearch))
+            {
+                switch (node)
+                {
+                    case MirageTwoColumnPageNode page:
+                        return page.Entry;
+                    case MirageTwoColumnFolderNode folder when folder.Entries.Count > 0:
+                        return folder.Entries[0];
+                }
+            }
+
+            return null;
+        }
+
+        return GetVisibleEntries(state, state.ShowSearch).Select(pair => pair.Entry).FirstOrDefault();
     }
 
     private static IEnumerable<(int Index, MirageTwoColumnEntry Entry)> GetVisibleEntries(
@@ -439,32 +578,64 @@ internal static class TwoColumnLayout
         }
     }
 
+    private static MirageTwoColumnEntryKind ResolveEntryKind(MirageTwoColumnState state, MirageTwoColumnEntry entry) =>
+        entry.Kind != MirageTwoColumnEntryKind.Default
+            ? entry.Kind
+            : state.ShowEntryToggle ? MirageTwoColumnEntryKind.Bool : MirageTwoColumnEntryKind.Default;
+
     private static void DrawListItem(
         MirageTwoColumnState state,
         MirageTwoColumnEntry entry,
-        bool showEntryToggle)
+        float indent = 0f)
     {
         using var entryId = ImRaii.PushId(entry.Id);
 
         var rowStartY = MirageLayout.Cursor.Y;
         var rowHeight = MirageLayout.Style.FrameHeight;
+        var kind = ResolveEntryKind(state, entry);
+        var hasLeadingControl = kind is MirageTwoColumnEntryKind.Bool or MirageTwoColumnEntryKind.Run;
 
         ImGui.AlignTextToFramePadding();
 
-        if (showEntryToggle)
+        var labelIndent = hasLeadingControl ? 0f : indent;
+
+        if (hasLeadingControl)
         {
-            var enabled = entry.Enabled;
-            if (ImGui.Checkbox("##TwoColumnToggle"u8, ref enabled))
+            if (indent > 0f)
+                MirageLayout.Cursor.X += indent;
+
+            switch (kind)
             {
-                entry.Enabled = enabled;
-                state.OnEnabledChanged?.Invoke(entry.Id, enabled);
+                case MirageTwoColumnEntryKind.Bool:
+                {
+                    var enabled = entry.Enabled;
+                    if (ImGui.Checkbox("##TwoColumnToggle"u8, ref enabled))
+                    {
+                        entry.Enabled = enabled;
+                        state.OnEnabledChanged?.Invoke(entry.Id, enabled);
+                    }
+
+                    break;
+                }
+                case MirageTwoColumnEntryKind.Run:
+                {
+                    var run = entry.Run;
+                    if (run != null)
+                    {
+                        using var runId = ImRaii.PushId("##Run"u8);
+                        ref var isRunning = ref run.IsRunning;
+                        ListSelectable.DrawRunButton(ref isRunning, run, rowHeight);
+                    }
+
+                    break;
+                }
             }
 
             ImGui.SameLine(0, MirageLayout.Style.ItemInnerSpacing.X);
         }
 
         var isSelected = state.SelectedId == entry.Id;
-        if (ListSelectable.Draw(entry.Label, isSelected, rowHeight))
+        if (ListSelectable.Draw(entry.Label, isSelected, rowHeight, labelIndent))
         {
             var nextId = isSelected ? null : entry.Id;
             state.SelectedId = nextId;

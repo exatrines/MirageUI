@@ -42,6 +42,12 @@ public sealed class MirageTwoColumnState
 
     public IList<MirageTwoColumnEntry> Entries { get; set; } = [];
 
+    public IList<MirageTwoColumnSidebarNode> SidebarNodes { get; set; } = [];
+
+    public HashSet<string> CollapsedFolderIds { get; set; } = new(StringComparer.Ordinal);
+
+    public float FolderPageIndent { get; init; } = 16f;
+
     public string? SelectedId { get; set; }
 
     public string SearchFilter { get; set; } = string.Empty;
