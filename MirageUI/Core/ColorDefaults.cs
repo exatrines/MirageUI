@@ -11,6 +11,7 @@ internal static class ColorDefaults
             MirageUi.Color.Accent => V(0.8392157f, 0.41568628f, 0.52156866f, 1f),
             MirageUi.Color.Title => V(0.83966243f, 0.4145169f, 0.5221488f, 1f),
             MirageUi.Color.Warning => V(1f, 0.55f, 0.2f, 1f),
+            MirageUi.Color.Info => V(0.4f, 0.72f, 0.95f, 1f),
             MirageUi.Color.PanelOverlay => V(1f, 1f, 1f, 0.05f),
             _ => V(1f, 1f, 1f, 1f),
         };

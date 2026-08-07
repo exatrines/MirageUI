@@ -95,6 +95,7 @@ public sealed class MirageColorSettings
         settings.SetColor(MirageUi.Color.Title, ColorDefaults.Get(MirageUi.Color.Title));
         settings.SetColor(MirageUi.Color.Accent, ColorDefaults.Get(MirageUi.Color.Accent));
         settings.SetColor(MirageUi.Color.Warning, ColorDefaults.Get(MirageUi.Color.Warning));
+        settings.SetColor(MirageUi.Color.Info, ColorDefaults.Get(MirageUi.Color.Info));
         settings.SetColor(MirageUi.Color.PanelOverlay, ColorDefaults.Get(MirageUi.Color.PanelOverlay));
         return settings;
     }

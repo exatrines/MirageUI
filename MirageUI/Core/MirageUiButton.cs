@@ -12,7 +12,6 @@ public static partial class MirageUi
 
     private const float ButtonFrameRounding = 3f;
     private const float ButtonExtraPaddingX = 6f;
-    private const float ButtonExtraPaddingY = 1f;
 
     /// <summary>
     /// Accent-styled button. Returns true when clicked.
@@ -27,7 +26,7 @@ public static partial class MirageUi
         var settings = MirageTheme.Active ?? MirageTheme.ResolveAppliedColors();
         var (bg, hovered, active, border, text) = GetButtonColors(settings, kind);
 
-        var framePadding = MirageLayout.Style.FramePadding;
+        var framePadding = ResolveInputFramePadding();
         var buttonId = string.IsNullOrEmpty(id) ? label : $"{label}##{id}";
 
         using var colors = ImRaii
@@ -41,7 +40,7 @@ public static partial class MirageUi
             .Push(ImGuiStyleVar.FrameBorderSize, 1f)
             .Push(ImGuiStyleVar.FramePadding, new Vector2(
                 framePadding.X + ButtonExtraPaddingX,
-                framePadding.Y + ButtonExtraPaddingY));
+                framePadding.Y));
 
         if (!enabled)
             ImGui.BeginDisabled();

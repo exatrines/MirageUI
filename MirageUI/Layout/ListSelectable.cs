@@ -4,7 +4,14 @@ using Dalamud.Interface;
 
 internal static class ListSelectable
 {
-    internal static bool Draw(string label, bool selected, float rowHeight, float indent = 0f)
+    internal static bool Draw(
+        string label,
+        bool selected,
+        float rowHeight,
+        float indent = 0f,
+        float trailingWidth = 0f,
+        bool dimmed = false,
+        Vector4? labelColor = null)
     {
         var g = ImGui.GetCurrentContext();
         var window = ImGuiP.GetCurrentWindow();
@@ -12,7 +19,9 @@ internal static class ListSelectable
         var startScreenPos = MirageLayout.Cursor.ScreenPosition;
         var innerStartScreenPos = startScreenPos + MirageLayout.Style.ItemInnerSpacing.XOnly();
         innerStartScreenPos.X += indent;
-        var endPos = startScreenPos + new Vector2(MirageLayout.Style.ContentRegionAvail.X - 12, rowHeight);
+        var endPos = startScreenPos + new Vector2(
+            MirageLayout.Style.ContentRegionAvail.X - 12 - Math.Max(0f, trailingWidth),
+            rowHeight);
         var bb = new ImRect(innerStartScreenPos, endPos);
         ImGuiP.ItemSize(new Vector2(bb.GetWidth(), rowHeight));
         if (!ImGuiP.ItemAdd(bb, id))
@@ -33,15 +42,29 @@ internal static class ListSelectable
         if (pressed)
             ImGuiP.MarkItemEdited(id);
 
-        if (hovered || selected)
+        if (hovered || selected || dimmed)
         {
-            var col = ImGui.GetColorU32((held && hovered) ? ImGuiCol.HeaderActive : hovered ? ImGuiCol.HeaderHovered : ImGuiCol.Header);
+            var col = dimmed && !hovered && !selected
+                ? ImGui.GetColorU32(ImGuiCol.Header, 0.35f)
+                : ImGui.GetColorU32((held && hovered) ? ImGuiCol.HeaderActive : hovered ? ImGuiCol.HeaderHovered : ImGuiCol.Header);
             ImGuiP.RenderFrame(bb.Min, bb.Max, col, false, 3.0f);
         }
 
         ImGuiP.RenderNavHighlight(bb, id, ImGuiNavHighlightFlags.TypeThin | ImGuiNavHighlightFlags.NoRounding);
 
         var padding = MirageLayout.Style.FramePadding;
+        var pushedText = false;
+        if (labelColor is { } tint)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, MirageUi.ToUInt(tint));
+            pushedText = true;
+        }
+        else if (dimmed)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetColorU32(ImGuiCol.Text, 0.45f));
+            pushedText = true;
+        }
+
         ImGuiP.RenderTextClipped(
             bb.Min + padding,
             bb.Max - padding,
@@ -49,16 +72,27 @@ internal static class ListSelectable
             Vector2.Zero,
             MirageLayout.Style.SelectableTextAlign,
             bb);
+        if (pushedText)
+            ImGui.PopStyleColor();
+
         return pressed;
     }
 
-    internal static bool DrawFolderHeader(string label, bool expanded, float rowHeight)
+    /// <returns>True when the header was clicked and toggling is allowed.</returns>
+    internal static bool DrawFolderHeader(
+        string label,
+        bool expanded,
+        float rowHeight,
+        bool canCollapse = true,
+        float trailingWidth = 0f)
     {
         var window = ImGuiP.GetCurrentWindow();
         var id = window.GetID("##Folder"u8);
         var startScreenPos = MirageLayout.Cursor.ScreenPosition;
         var innerStartScreenPos = startScreenPos + MirageLayout.Style.ItemInnerSpacing.XOnly();
-        var endPos = startScreenPos + new Vector2(MirageLayout.Style.ContentRegionAvail.X - 12, rowHeight);
+        var endPos = startScreenPos + new Vector2(
+            MirageLayout.Style.ContentRegionAvail.X - 12 - Math.Max(0f, trailingWidth),
+            rowHeight);
         var bb = new ImRect(innerStartScreenPos, endPos);
         ImGuiP.ItemSize(new Vector2(bb.GetWidth(), rowHeight));
         if (!ImGuiP.ItemAdd(bb, id))
@@ -66,14 +100,18 @@ internal static class ListSelectable
 
         var hovered = false;
         var held = false;
-        var pressed = ImGuiP.ButtonBehavior(bb, id, ref hovered, ref held, ImGuiButtonFlags.None);
-        if (pressed)
-            ImGuiP.MarkItemEdited(id);
-
-        if (hovered)
+        var pressed = false;
+        if (canCollapse)
         {
-            var col = ImGui.GetColorU32((held && hovered) ? ImGuiCol.HeaderActive : ImGuiCol.HeaderHovered);
-            ImGuiP.RenderFrame(bb.Min, bb.Max, col, false, 3.0f);
+            pressed = ImGuiP.ButtonBehavior(bb, id, ref hovered, ref held, ImGuiButtonFlags.None);
+            if (pressed)
+                ImGuiP.MarkItemEdited(id);
+
+            if (hovered)
+            {
+                var col = ImGui.GetColorU32((held && hovered) ? ImGuiCol.HeaderActive : ImGuiCol.HeaderHovered);
+                ImGuiP.RenderFrame(bb.Min, bb.Max, col, false, 3.0f);
+            }
         }
 
         var padding = MirageLayout.Style.FramePadding;

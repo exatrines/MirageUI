@@ -1,4 +1,5 @@
 using Dalamud.Interface;
+using MirageUI.Theme;
 
 namespace MirageUI.Ui;
 
@@ -12,6 +13,7 @@ internal static class MirageIconButton
     internal static readonly Vector4 RunGreen = new(0.45f, 0.85f, 0.45f, 1f);
     internal static readonly Vector4 RunRed = new(0.9f, 0.35f, 0.35f, 1f);
 
+    private const float FrameRounding = 3f;
     private const float PaddingTop = -1f;
     private const float PaddingBottom = 1f;
 
@@ -27,11 +29,12 @@ internal static class MirageIconButton
         Vector4? activeBackgroundColor,
         string? tooltip,
         MirageTooltipPosition tooltipPosition,
-        bool enabled)
+        bool enabled,
+        bool border)
     {
         if (size == Vector2.Zero)
         {
-            var height = MirageLayout.Style.FrameHeight;
+            var height = MirageUi.ResolveControlHeight();
             size = new Vector2(height, height);
         }
 
@@ -54,10 +57,27 @@ internal static class MirageIconButton
         if (enabled && held && hovered)
             bg = activeBackgroundColor ?? ResolveActiveBackground(backgroundColor);
         else if (enabled && hovered)
-            bg = hoveredBackgroundColor ?? ResolveHoveredBackground(backgroundColor);
+        {
+            // Transparent icons: hover via text color only (no fill flash).
+            bg = hoveredBackgroundColor
+                 ?? (backgroundColor.W <= 0f ? backgroundColor : ResolveHoveredBackground(backgroundColor));
+        }
 
-        if (bg.W > 0f)
-            ImGuiP.RenderFrame(bb.Min, bb.Max, MirageUi.ToUInt(bg), false, 0f);
+        if (border || bg.W > 0f)
+        {
+            if (border)
+            {
+                var settings = MirageTheme.Active ?? MirageTheme.ResolveAppliedColors();
+                var borderColor = settings.GetColor(MirageUi.Color.Accent);
+                using (ImRaii.PushColor(ImGuiCol.Border, borderColor))
+                using (ImRaii.PushStyle(ImGuiStyleVar.FrameBorderSize, 1f))
+                    ImGuiP.RenderFrame(bb.Min, bb.Max, MirageUi.ToUInt(bg), true, FrameRounding);
+            }
+            else
+            {
+                ImGuiP.RenderFrame(bb.Min, bb.Max, MirageUi.ToUInt(bg), false, 0f);
+            }
+        }
 
         ImGuiP.RenderNavHighlight(bb, widgetId, ImGuiNavHighlightFlags.TypeThin | ImGuiNavHighlightFlags.NoRounding);
 
@@ -75,15 +95,16 @@ internal static class MirageIconButton
             availMin.X + (availMax.X - availMin.X - iconSize.X) * 0.5f,
             availMin.Y + (availMax.Y - availMin.Y - iconSize.Y) * 0.5f);
 
+        var settingsForText = MirageTheme.Active ?? MirageTheme.ResolveAppliedColors();
         var drawColor = enabled ? textColor : WithAlpha(textColor, 0.6f);
         if (enabled && hovered)
-            drawColor = hoverTextColor ?? drawColor;
+            drawColor = hoverTextColor ?? settingsForText.GetColor(MirageUi.Color.Accent);
 
         ImGui.PushFont(UiBuilder.IconFont);
         ImGui.GetWindowDrawList().AddText(iconPos, MirageUi.ToUInt(drawColor), label);
         ImGui.PopFont();
 
-        if (enabled && hovered && !string.IsNullOrEmpty(tooltip))
+        if (hovered && !string.IsNullOrEmpty(tooltip))
             MirageTooltip.Show(tooltip, tooltipPosition, bb);
 
         return pressed;

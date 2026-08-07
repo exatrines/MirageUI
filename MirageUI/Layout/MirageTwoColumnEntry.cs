@@ -11,4 +11,11 @@ public sealed class MirageTwoColumnEntry
     public bool Enabled { get; set; } = true;
 
     public MirageTwoColumnRunBinding? Run { get; init; }
+
+    /// <summary>Optional label tint. Null keeps the default text color.</summary>
+    public Vector4? LabelColor { get; init; }
+
+    public IList<MirageTwoColumnTrailingAction> TrailingActions { get; init; } = [];
+
+    public IList<MirageTwoColumnContextMenuItem> ContextMenuItems { get; init; } = [];
 }

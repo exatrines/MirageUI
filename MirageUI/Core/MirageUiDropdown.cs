@@ -1,22 +1,24 @@
 using MirageUI.Theme;
+using MirageUI.Ui;
 
 namespace MirageUI;
 
 public static partial class MirageUi
 {
-    private const float DropdownFrameRounding = 4f;
     private const float DropdownPopupRounding = 4f;
+    private const float DropdownPopupPaddingX = 6f;
+    private const float DropdownPopupPaddingY = 6f;
 
     /// <summary>
-    /// Default width: half of the right-column content width.
+    /// Default width: fill the field column (table layout) or half content when unlabeled.
     /// </summary>
     public const float DropdownWidthHalfMain = 0f;
 
-    private static readonly Stack<(ImRaii.ColorDisposable Colors, ImRaii.StyleDisposable Styles, string Label)> DropdownScopes = new();
+    private static readonly Stack<(ImRaii.ColorDisposable Colors, ImRaii.StyleDisposable Styles, bool UsedTable)> DropdownScopes = new();
 
     /// <summary>
     /// Accent-colored dropdown. Returns true when the selection changes.
-    /// Layout: [combo] [label]. Default width is half the right-column content.
+    /// Layout: [label | combo] via Table API.
     /// </summary>
     public static bool Dropdown(
         string label,
@@ -26,20 +28,133 @@ public static partial class MirageUi
         string id = "",
         bool allowClear = true,
         string? emptyMessage = null,
-        float width = DropdownWidthHalfMain)
+        float width = InputWidthFill,
+        bool? liveMatch = null,
+        string? matchTooltip = null)
     {
         var preview = string.IsNullOrWhiteSpace(selected)
             ? (placeholder ?? string.Empty)
             : selected;
 
-        if (!BeginDropdown(label, preview, id, width, hasValue: !string.IsNullOrWhiteSpace(selected)))
+        if (!BeginDropdown(
+                label,
+                preview,
+                id,
+                width,
+                hasValue: !string.IsNullOrWhiteSpace(selected),
+                liveMatch: liveMatch,
+                matchTooltip: matchTooltip))
             return false;
 
+        var changed = DrawDropdownItems(ref selected, items, placeholder, allowClear, emptyMessage, filter: null);
+        EndDropdown();
+        return changed;
+    }
+
+    /// <summary>
+    /// Accent-colored searchable dropdown. Filters items by <paramref name="searchFilter"/>.
+    /// Layout: [label | combo] via Table API.
+    /// When <paramref name="headerButtonLabel"/> is set, the popup header is
+    /// [search 50% | button 50%].
+    /// </summary>
+    public static bool SearchableDropdown(
+        string label,
+        ref string selected,
+        IReadOnlyList<string> items,
+        ref string searchFilter,
+        string? placeholder = "(not set)",
+        string id = "",
+        bool allowClear = true,
+        string? emptyMessage = null,
+        string searchHint = "Search…",
+        float width = InputWidthFill,
+        string? headerButtonLabel = null,
+        Action? onHeaderButton = null,
+        bool? liveMatch = null,
+        string? matchTooltip = null)
+    {
+        var preview = string.IsNullOrWhiteSpace(selected)
+            ? (placeholder ?? string.Empty)
+            : selected;
+
+        if (!BeginDropdown(
+                label,
+                preview,
+                id,
+                width,
+                hasValue: !string.IsNullOrWhiteSpace(selected),
+                comboFlags: ImGuiComboFlags.HeightLarge,
+                liveMatch: liveMatch,
+                matchTooltip: matchTooltip))
+            return false;
+
+        if (ImGui.IsWindowAppearing())
+            searchFilter = string.Empty;
+
+        ImGui.PushID(string.IsNullOrEmpty(id) ? label : id);
+
+        var hasHeaderButton = !string.IsNullOrWhiteSpace(headerButtonLabel);
+        if (hasHeaderButton)
+        {
+            var avail = ImGui.GetContentRegionAvail().X;
+            var gap = MirageLayout.Style.ItemSpacing.X;
+            var half = Math.Max(1f, (avail - gap) * 0.5f);
+            SearchFilter("##Search"u8, ref searchFilter, searchHint, width: half);
+            ImGui.SameLine(0f, gap);
+            if (PrimaryButton(headerButtonLabel!, width: half, id: "headerAction"))
+            {
+                onHeaderButton?.Invoke();
+                ImGui.CloseCurrentPopup();
+            }
+        }
+        else
+        {
+            SearchFilter("##Search"u8, ref searchFilter, searchHint);
+        }
+
+        ImGui.PopID();
+
+        // Keep the search bar fixed; only the item list scrolls.
+        ImGui.Separator();
+        var listHeight = MathF.Max(
+            ImGui.GetTextLineHeightWithSpacing() * 8f,
+            ImGui.GetContentRegionAvail().Y);
+        var changed = false;
+        if (ImGui.BeginChild(
+                "##DropdownItems"u8,
+                new Vector2(0f, listHeight),
+                false,
+                ImGuiWindowFlags.HorizontalScrollbar))
+        {
+            changed = DrawDropdownItems(
+                ref selected,
+                items,
+                placeholder,
+                allowClear,
+                emptyMessage,
+                filter: searchFilter);
+        }
+
+        ImGui.EndChild();
+        EndDropdown();
+        return changed;
+    }
+
+    private static bool DrawDropdownItems(
+        ref string selected,
+        IReadOnlyList<string> items,
+        string? placeholder,
+        bool allowClear,
+        string? emptyMessage,
+        string? filter)
+    {
         var changed = false;
 
         if (allowClear && placeholder != null)
         {
-            if (DropdownItem(placeholder, string.IsNullOrWhiteSpace(selected)))
+            var clearVisible = string.IsNullOrWhiteSpace(filter)
+                               || MatchesFilter(placeholder, placeholder, filter);
+            if (clearVisible && DropdownItem(placeholder, string.IsNullOrWhiteSpace(selected)))
             {
                 if (!string.IsNullOrWhiteSpace(selected))
                 {
@@ -49,46 +164,60 @@ public static partial class MirageUi
             }
         }
 
-        if (items.Count == 0)
+        var visibleCount = 0;
+        foreach (var item in items)
         {
-            if (!string.IsNullOrEmpty(emptyMessage))
-                ImGui.TextDisabled(emptyMessage);
-        }
-        else
-        {
-            foreach (var item in items)
-            {
-                var isSelected = string.Equals(selected, item, StringComparison.Ordinal);
-                if (!DropdownItem(item, isSelected))
-                    continue;
+            if (!string.IsNullOrWhiteSpace(filter) && !MatchesFilter(item, item, filter))
+                continue;
 
-                if (isSelected)
-                    continue;
+            visibleCount++;
+            var isSelected = string.Equals(selected, item, StringComparison.Ordinal);
+            if (!DropdownItem(item, isSelected))
+                continue;
 
-                selected = item;
-                changed = true;
-            }
+            if (isSelected)
+                continue;
+
+            selected = item;
+            changed = true;
         }
 
-        EndDropdown();
+        if (visibleCount == 0 && items.Count == 0 && !string.IsNullOrEmpty(emptyMessage))
+            ImGui.TextDisabled(emptyMessage);
+        else if (visibleCount == 0 && !string.IsNullOrWhiteSpace(filter))
+            ImGui.TextDisabled("No matches");
+
         return changed;
     }
 
     /// <summary>
-    /// Starts an accent-colored dropdown. When true, draw items then call <see cref="EndDropdown"/>.
-    /// Layout: [combo] [label]. Default width is half the right-column content.
+    /// Starts an accent-colored dropdown inside a [label | field] table row.
+    /// When true, draw items then call <see cref="EndDropdown"/>.
     /// </summary>
     public static bool BeginDropdown(
         string label,
         string preview,
         string id = "",
-        float width = DropdownWidthHalfMain,
-        bool hasValue = true)
+        float width = InputWidthFill,
+        bool hasValue = true,
+        ImGuiComboFlags comboFlags = ImGuiComboFlags.None,
+        bool? liveMatch = null,
+        string? matchTooltip = null)
     {
+        var fieldId = string.IsNullOrEmpty(id) ? label : id;
+        if (!BeginFieldRow(label, fieldId, out var usedTable, liveMatch, matchTooltip))
+            return false;
+
         var settings = MirageTheme.Active ?? MirageTheme.ResolveAppliedColors();
         var accent = settings.GetColor(Color.Accent);
         var (frame, hovered, active, border, header, headerHovered, headerActive, popupBg) =
             GetDropdownColors(settings, accent);
+
+        var framePadding = ResolveInputFramePadding();
+        var scale = MirageLayout.Style.Scale;
+        var popupPadding = new Vector2(
+            DropdownPopupPaddingX * scale,
+            DropdownPopupPaddingY * scale);
 
         var colors = new ImRaii.ColorDisposable()
             .Push(ImGuiCol.FrameBg, frame)
@@ -105,32 +234,33 @@ public static partial class MirageUi
             .Push(ImGuiCol.CheckMark, accent);
 
         var styles = new ImRaii.StyleDisposable()
-            .Push(ImGuiStyleVar.FrameRounding, DropdownFrameRounding)
+            .Push(ImGuiStyleVar.FrameRounding, InputStyle.FrameRounding)
             .Push(ImGuiStyleVar.PopupRounding, DropdownPopupRounding)
             .Push(ImGuiStyleVar.FrameBorderSize, 1f)
-            .Push(ImGuiStyleVar.PopupBorderSize, 1f);
+            .Push(ImGuiStyleVar.PopupBorderSize, 1f)
+            .Push(ImGuiStyleVar.FramePadding, framePadding)
+            .Push(ImGuiStyleVar.WindowPadding, popupPadding);
 
-        DropdownScopes.Push((colors, styles, label));
+        DropdownScopes.Push((colors, styles, usedTable));
 
         var comboId = string.IsNullOrEmpty(id) ? $"##{label}" : $"##{id}";
-
         var previewColor = hasValue
             ? settings.GetColor(Color.Default)
             : settings.GetColor(Color.Secondary);
+        var controlWidth = ResolveFieldControlWidth(width, usedTable);
+
+        ImGui.SetNextItemWidth(controlWidth);
         ImGui.PushStyleColor(ImGuiCol.Text, previewColor);
-        ImGui.SetNextItemWidth(ResolveDropdownWidth(width));
-        var open = ImGui.BeginCombo(comboId, preview, ImGuiComboFlags.None);
+        var open = ImGui.BeginCombo(comboId, preview, comboFlags);
         ImGui.PopStyleColor();
 
         if (!open)
         {
-            // Closed: still in the parent window — draw trailing label here.
-            DrawTrailingLabel(label);
             PopDropdownScope();
             return false;
         }
 
-        // Open: do not draw the label inside the popup (BeginCombo redirects widgets there).
+        // Open: popup content is drawn by the caller before EndDropdown.
         return true;
     }
 
@@ -143,10 +273,7 @@ public static partial class MirageUi
             return;
         }
 
-        var label = DropdownScopes.Peek().Label;
         ImGui.EndCombo();
-        // After EndCombo we are back in the parent window — draw trailing label beside the combo.
-        DrawTrailingLabel(label);
         PopDropdownScope();
     }
 
@@ -159,32 +286,15 @@ public static partial class MirageUi
         return clicked;
     }
 
-    /// <summary>
-    /// Resolves width. Values &lt;= 0 use half of the available content width.
-    /// </summary>
-    private static float ResolveDropdownWidth(float width) =>
-        width > 0f
-            ? width
-            : MathF.Max(1f, MirageLayout.Style.ContentRegionAvail.X * 0.5f);
-
-    private static void DrawTrailingLabel(string label)
-    {
-        if (string.IsNullOrEmpty(label))
-            return;
-
-        ImGui.SameLine();
-        ImGui.AlignTextToFramePadding();
-        ImGui.TextUnformatted(label);
-    }
-
     private static void PopDropdownScope()
     {
         if (DropdownScopes.Count == 0)
             return;
 
-        var (colors, styles, _) = DropdownScopes.Pop();
+        var (colors, styles, usedTable) = DropdownScopes.Pop();
         styles.Dispose();
         colors.Dispose();
+        EndFieldRow(usedTable);
     }
 
     private static (
@@ -205,14 +315,7 @@ public static partial class MirageUi
         var header = WithAlpha(accent, 0.32f);
         var headerHovered = WithAlpha(accent, 0.48f);
         var headerActive = WithAlpha(accent, 0.60f);
-        var popupBg = Mix(settings.WindowBg, accent, 0.08f);
+        var popupBg = MixColors(settings.WindowBg, accent, 0.08f);
         return (frame, hovered, active, border, header, headerHovered, headerActive, popupBg);
     }
-
-    private static Vector4 Mix(Vector4 a, Vector4 b, float t) =>
-        new(
-            a.X + (b.X - a.X) * t,
-            a.Y + (b.Y - a.Y) * t,
-            a.Z + (b.Z - a.Z) * t,
-            a.W + (b.W - a.W) * t);
 }

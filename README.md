@@ -1,4 +1,4 @@
-﻿# MirageUI
+# MirageUI
 
 Dalamud プラグイン向けの ImGui UI キット。テキスト・テーマ・2 カラムレイアウトを統一した API で提供する。
 
@@ -160,7 +160,7 @@ if (MirageUi.Button("Save", MirageUi.ButtonKind.Primary, width: 120f))
 ### Dropdown
 
 
-アクセントカラーのプルダウン。レイアウトは `[プルダウン] [項目名]`（開いているあいだも項目名はコンボ横に表示し、リスト内には出さない）。既定幅は右ページ内容幅の半分（左余白込みで右ページ約半分）。
+アクセントカラーのプルダウン。レイアウトは Table API の `[ラベル | プルダウン]`（左ラベル・右入力）。右列は残り幅いっぱい。
 
 ```csharp
 var selected = "Paladin";
@@ -181,8 +181,36 @@ if (MirageUi.BeginDropdown("Job", preview, id: "job", hasValue: true))
 | API | 説明 |
 | --- | --- |
 | `Dropdown(label, ref selected, items, ...)` | 文字列リストのプルダウン |
+| `SearchableDropdown(..., ref searchFilter, ...)` | 検索付きプルダウン |
 | `BeginDropdown` / `EndDropdown` | カスタム項目用 |
 | `DropdownItem(label, selected)` | 項目（選択中はフォーカス） |
+| `FieldLabelColumnWidth` | 左ラベル列の固定幅 |
+
+### Input
+
+
+アクセントカラーのテキスト／数値入力。レイアウトは Dropdown と同じ Table API の `[ラベル | 入力]`。
+
+```csharp
+var name = "Untitled";
+if (MirageUi.InputText("Name", ref name, 128))
+{
+    // changed
+}
+
+var level = 0;
+MirageUi.InputInt("Job level (0=Any)", ref level);
+
+var time = 0f;
+MirageUi.InputFloat(string.Empty, ref time, format: "%.1f", id: "time", width: MirageUi.InputWidthFill);
+```
+
+| API | 説明 |
+| --- | --- |
+| `InputText` | 文字列入力（`hint` でプレースホルダ可） |
+| `InputInt` | 整数入力 |
+| `InputFloat` | 小数入力 |
+| `InputWidthFill` | 右列いっぱい（またはラベルなし時の全幅） |
 
 ### その他
 

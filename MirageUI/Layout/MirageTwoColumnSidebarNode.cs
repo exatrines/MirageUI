@@ -9,6 +9,11 @@ public sealed class MirageTwoColumnFolderNode : MirageTwoColumnSidebarNode
     public required string Label { get; init; }
 
     public IList<MirageTwoColumnEntry> Entries { get; init; } = [];
+
+    /// <summary>When true, the folder stays expanded and its header does not toggle.</summary>
+    public bool AlwaysExpanded { get; init; }
+
+    public IList<MirageTwoColumnTrailingAction> TrailingActions { get; init; } = [];
 }
 
 public sealed class MirageTwoColumnPageNode : MirageTwoColumnSidebarNode

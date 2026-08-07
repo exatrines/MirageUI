@@ -1,10 +1,13 @@
 namespace MirageUI.Layout;
 
+using Dalamud.Interface;
+
 internal static class TwoColumnLayout
 {
     internal static void Draw(
         MirageTwoColumnState state,
-        Action drawMainContent)
+        Action drawMainContent,
+        Action? drawRightContent = null)
     {
         var scale = MirageLayout.Style.Scale;
         var startPos = MirageLayout.Cursor.Position;
@@ -12,7 +15,7 @@ internal static class TwoColumnLayout
         if (!state.ShowSidebar)
         {
             MirageLayout.Cursor.Position = startPos;
-            DrawMainContent(state, scale, drawMainContent);
+            DrawContentPanels(state, scale, drawMainContent, drawRightContent);
             return;
         }
 
@@ -66,7 +69,7 @@ internal static class TwoColumnLayout
         }
 
         MirageLayout.Cursor.Position = startPos + new Vector2(sidebarWidth, 0);
-        DrawMainContent(state, scale, drawMainContent);
+        DrawContentPanels(state, scale, drawMainContent, drawRightContent);
     }
 
     private readonly struct SidebarLayout
@@ -142,7 +145,11 @@ internal static class TwoColumnLayout
     private static float GetSearchInputHeight(float scale, MirageTwoColumnState state)
     {
         var framePadding = state.SearchFramePadding * scale;
-        return ImGui.GetFontSize() + framePadding.Y * 2f;
+        var inputHeight = ImGui.GetFontSize() + framePadding.Y * 2f;
+        if (state.SearchTrailingActions.Count == 0)
+            return inputHeight;
+
+        return Math.Max(inputHeight, MirageUi.ResolveControlHeight());
     }
 
     private static float GetTopSearchSectionHeight(float scale, MirageTwoColumnState state) =>
@@ -207,9 +214,15 @@ internal static class TwoColumnLayout
             return 0f;
 
         var padding = state.SidebarPadding * scale;
-        var itemSpacing = MirageLayout.Style.ItemSpacing.Y;
         var imageHeight = string.IsNullOrWhiteSpace(header.ImagePath) ? 0f : header.ImageHeight * scale;
+        var textHeight = MeasureHeaderTextHeight(header);
+        var actionsHeight = header.TrailingActions.Count > 0 ? MirageUi.ResolveControlHeight() : 0f;
+        var contentHeight = Math.Max(imageHeight, Math.Max(textHeight, actionsHeight));
+        return padding.Y * 2f + contentHeight + GetPaddedSeparatorHeight();
+    }
 
+    private static float MeasureHeaderTextHeight(MirageTwoColumnSidebarHeader header)
+    {
         var textHeight = 0f;
         if (!string.IsNullOrWhiteSpace(header.Title))
         {
@@ -220,13 +233,11 @@ internal static class TwoColumnLayout
         if (!string.IsNullOrWhiteSpace(header.Subtitle))
         {
             if (textHeight > 0f)
-                textHeight += itemSpacing;
-
+                textHeight += MirageLayout.Style.ItemSpacing.Y;
             textHeight += ImGui.CalcTextSize(header.Subtitle).Y;
         }
 
-        var contentHeight = Math.Max(imageHeight, textHeight);
-        return padding.Y * 2f + contentHeight + GetPaddedSeparatorHeight();
+        return textHeight;
     }
 
     private static readonly ImGuiWindowFlags FixedSectionFlags =
@@ -247,7 +258,12 @@ internal static class TwoColumnLayout
         var hasImage = !string.IsNullOrWhiteSpace(header.ImagePath);
         var hasTitle = !string.IsNullOrWhiteSpace(header.Title);
         var hasSubtitle = !string.IsNullOrWhiteSpace(header.Subtitle);
+        var hasActions = header.TrailingActions.Count > 0;
         var hasText = hasTitle || hasSubtitle;
+        var buttonSize = MirageUi.ResolveControlHeight();
+        var textHeight = MeasureHeaderTextHeight(header);
+        var actionsHeight = hasActions ? buttonSize : 0f;
+        var contentHeight = Math.Max(imageHeight, Math.Max(textHeight, actionsHeight));
 
         using var childStyle = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, padding);
         using var child = ImRaii.Child(
@@ -260,30 +276,22 @@ internal static class TwoColumnLayout
 
         childStyle.Dispose();
 
+        var contentStart = MirageLayout.Cursor.Position;
+
         if (hasImage)
             MirageUi.Image(header.ImagePath!, imageWidth, imageHeight, header.ImageIsCircle);
 
         if (hasText)
         {
-            var textHeight = 0f;
-            if (hasTitle)
-            {
-                using (MirageUi.PushFont(MirageUi.FontSize.Large))
-                    textHeight += ImGui.CalcTextSize(header.Title).Y;
-            }
-
-            if (hasSubtitle)
-            {
-                if (textHeight > 0f)
-                    textHeight += MirageLayout.Style.ItemSpacing.Y;
-
-                textHeight += ImGui.CalcTextSize(header.Subtitle).Y;
-            }
-
             if (hasImage)
             {
                 var yOffset = Math.Max(0f, (imageHeight - textHeight) * 0.5f);
                 ImGui.SameLine(0f, padding.X);
+                MirageLayout.Cursor.Y += yOffset;
+            }
+            else
+            {
+                var yOffset = Math.Max(0f, (contentHeight - textHeight) * 0.5f);
                 MirageLayout.Cursor.Y += yOffset;
             }
 
@@ -300,7 +308,71 @@ internal static class TwoColumnLayout
             ImGui.EndGroup();
         }
 
+        if (hasActions)
+            DrawHeaderTrailingActions(header, contentStart.Y + contentHeight - buttonSize, buttonSize);
+
+        MirageLayout.Cursor.Position = new Vector2(contentStart.X, contentStart.Y + contentHeight);
         MirageUi.PaddedSeparator();
+    }
+
+    private static void DrawHeaderTrailingActions(
+        MirageTwoColumnSidebarHeader header,
+        float buttonY,
+        float buttonSize)
+    {
+        var gap = MirageLayout.Style.ItemInnerSpacing.X;
+        var actions = header.TrailingActions;
+        var actionsWidth = (actions.Count * buttonSize) + ((actions.Count - 1) * gap);
+        var startX = MirageLayout.Style.ContentRegionMax.X - actionsWidth;
+        MirageLayout.Cursor.Position = new Vector2(startX, buttonY);
+
+        for (var i = 0; i < actions.Count; i++)
+        {
+            var action = actions[i];
+            using var actionId = ImRaii.PushId(action.Id);
+            if (MirageUi.IconButton(
+                    action.Icon,
+                    "##headerTrail",
+                    new Vector2(buttonSize, buttonSize),
+                    tooltip: action.Tooltip))
+            {
+                if (action.ContextMenuItems.Count > 0)
+                    ImGui.OpenPopup("##HeaderTrailContext");
+                else
+                    action.OnClick?.Invoke();
+            }
+
+            DrawTrailingActionContextMenu(action);
+
+            if (i < actions.Count - 1)
+                ImGui.SameLine(0, gap);
+        }
+    }
+
+    private static void DrawTrailingActionContextMenu(MirageTwoColumnTrailingAction action)
+    {
+        if (action.ContextMenuItems.Count == 0)
+            return;
+
+        var labels = new string[action.ContextMenuItems.Count];
+        for (var i = 0; i < action.ContextMenuItems.Count; i++)
+            labels[i] = action.ContextMenuItems[i].Label;
+
+        var style = MirageContextMenuStyle.CreateDefault();
+        if (!MirageUi.ContextMenu.Begin("##HeaderTrailContext", labels, style))
+            return;
+
+        foreach (var item in action.ContextMenuItems)
+        {
+            var icon = item.Icon ?? FontAwesomeIcon.Circle;
+            if (!MirageUi.ContextMenu.DrawItem(item.Label, icon, item.Id, style))
+                continue;
+
+            item.OnClick?.Invoke();
+            ImGui.CloseCurrentPopup();
+        }
+
+        MirageUi.ContextMenu.End();
     }
 
     private static void DrawSidebarFooter(
@@ -383,18 +455,69 @@ internal static class TwoColumnLayout
             .PushStyle(ImGuiStyleVar.FramePadding, framePadding)
             .Push(ImGuiStyleVar.FrameRounding, 3);
 
+        var actions = state.SearchTrailingActions;
+        var buttonSize = MirageUi.ResolveControlHeight();
+        var gap = MirageLayout.Style.ItemInnerSpacing.X;
+        var actionsWidth = actions.Count == 0
+            ? 0f
+            : (actions.Count * buttonSize) + ((actions.Count - 1) * gap);
+        var searchWidth = actionsWidth > 0f
+            ? Math.Max(40f, MirageLayout.Style.ContentRegionAvail.X - actionsWidth - gap)
+            : -1f;
+
         var searchFilter = state.SearchFilter;
-        if (!MirageUi.SearchFilter("##TwoColumnSearchInput"u8, ref searchFilter, state.SearchHint, state.SearchMaxLength))
+        var changed = MirageUi.SearchFilter(
+            "##TwoColumnSearchInput"u8,
+            ref searchFilter,
+            state.SearchHint,
+            state.SearchMaxLength,
+            width: searchWidth);
+        state.SearchFilter = searchFilter;
+        state.OnSearchFilterChanged?.Invoke(searchFilter);
+
+        if (actions.Count > 0)
+        {
+            ImGui.SameLine(0f, gap);
+            var rowStart = MirageLayout.Cursor.Position;
+            for (var i = 0; i < actions.Count; i++)
+            {
+                var action = actions[i];
+                using var actionId = ImRaii.PushId(action.Id);
+                if (i > 0)
+                    ImGui.SameLine(0f, gap);
+
+                if (MirageUi.IconButton(
+                        action.Icon,
+                        "##searchTrail",
+                        new Vector2(buttonSize, buttonSize),
+                        tooltip: action.Tooltip))
+                {
+                    if (action.ContextMenuItems.Count > 0)
+                        ImGui.OpenPopup("##TrailContext");
+                    else
+                        action.OnClick?.Invoke();
+                }
+
+                DrawRowTrailingActionContextMenu(action);
+            }
+
+            // Keep layout cursor on the search row baseline.
+            _ = rowStart;
+        }
+
+        if (!changed || !state.AutoSelectFirstOnSearch)
             return;
 
-        state.SearchFilter = searchFilter;
+        // Keep selection when clearing; jump to first match while filtering.
+        if (string.IsNullOrWhiteSpace(state.SearchFilter))
+            return;
 
         var firstEntry = GetFirstVisibleEntry(state);
-        var nextId = string.IsNullOrWhiteSpace(state.SearchFilter)
-            ? null
-            : firstEntry?.Id;
-        state.SelectedId = nextId;
-        state.OnSelectionChanged?.Invoke(nextId ?? string.Empty);
+        if (firstEntry == null)
+            return;
+
+        state.SelectedId = firstEntry.Id;
+        state.OnSelectionChanged?.Invoke(firstEntry.Id);
     }
 
     private static void DrawSidebarList(
@@ -419,13 +542,117 @@ internal static class TwoColumnLayout
 
         if (UsesGroupedSidebar(state))
         {
+            var reorderEnabled = state.EnableEntryReorder
+                && (!hasSearch || string.IsNullOrWhiteSpace(state.SearchFilter));
+
+            if (!reorderEnabled && !string.IsNullOrEmpty(state.EntryReorderDragId))
+            {
+                state.EntryReorderDragId = null;
+                state.OnEntryReorderDragIdChanged?.Invoke(null);
+            }
+
             foreach (var node in GetVisibleSidebarNodes(state, hasSearch))
-                DrawSidebarNode(state, node, scale);
+                DrawSidebarNode(state, node, scale, reorderEnabled);
             return;
         }
 
-        foreach (var (_, entry) in GetVisibleEntries(state, hasSearch))
-            DrawListItem(state, entry);
+        var visible = GetVisibleEntries(state, hasSearch).ToList();
+        var flatReorderEnabled = state.EnableEntryReorder
+            && (!hasSearch || string.IsNullOrWhiteSpace(state.SearchFilter));
+
+        if (!flatReorderEnabled && !string.IsNullOrEmpty(state.EntryReorderDragId))
+        {
+            state.EntryReorderDragId = null;
+            state.OnEntryReorderDragIdChanged?.Invoke(null);
+        }
+
+        var rowBounds = new List<(string Id, float Top, float Bottom, int Index)>(visible.Count);
+
+        foreach (var (index, entry) in visible)
+        {
+            var top = MirageLayout.Cursor.ScreenPosition.Y;
+            DrawListItem(state, entry, indent: 0f, flatReorderEnabled);
+            var bottom = top + MirageLayout.Style.FrameHeight;
+            rowBounds.Add((entry.Id, top, bottom, index));
+        }
+
+        if (!flatReorderEnabled)
+            return;
+
+        UpdateEntryReorder(state, rowBounds, scale);
+    }
+
+    private static void UpdateEntryReorder(
+        MirageTwoColumnState state,
+        List<(string Id, float Top, float Bottom, int Index)> rows,
+        float scale)
+    {
+        var dragId = state.EntryReorderDragId;
+        if (string.IsNullOrEmpty(dragId))
+            return;
+
+        if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
+        {
+            var dropIndex = rows.Count == 0
+                ? 0
+                : ComputeDropInsertIndex(rows, ImGui.GetMousePos().Y);
+            var from = rows.FindIndex(r => string.Equals(r.Id, dragId, StringComparison.Ordinal));
+            state.EntryReorderDragId = null;
+            state.OnEntryReorderDragIdChanged?.Invoke(null);
+
+            if (from >= 0 && dropIndex != from && dropIndex != from + 1)
+                state.OnEntryReordered?.Invoke(dragId, dropIndex);
+            return;
+        }
+
+        if (rows.Count == 0)
+            return;
+
+        var insertIndex = ComputeDropInsertIndex(rows, ImGui.GetMousePos().Y);
+        DrawReorderGapHighlight(rows, insertIndex, scale);
+    }
+
+    private static int ComputeDropInsertIndex(
+        List<(string Id, float Top, float Bottom, int Index)> rows,
+        float mouseY)
+    {
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var mid = (rows[i].Top + rows[i].Bottom) * 0.5f;
+            if (mouseY < mid)
+                return i;
+        }
+
+        return rows.Count;
+    }
+
+    private static void DrawReorderGapHighlight(
+        List<(string Id, float Top, float Bottom, int Index)> rows,
+        int insertIndex,
+        float scale)
+    {
+        if (rows.Count == 0)
+            return;
+
+        float y;
+        if (insertIndex <= 0)
+            y = rows[0].Top;
+        else if (insertIndex >= rows.Count)
+            y = rows[^1].Bottom;
+        else
+            y = (rows[insertIndex - 1].Bottom + rows[insertIndex].Top) * 0.5f;
+
+        var padding = 12f * scale;
+        var thickness = Math.Max(2f, 3f * scale);
+        var window = ImGuiP.GetCurrentWindow();
+        var left = window.InnerRect.Min.X + padding;
+        var right = window.InnerRect.Max.X - padding;
+        var accent = MirageUi.ToUInt(MirageUi.GetColor(MirageUi.Color.Accent));
+        ImGui.GetWindowDrawList().AddRectFilled(
+            new Vector2(left, y - thickness * 0.5f),
+            new Vector2(right, y + thickness * 0.5f),
+            accent,
+            thickness);
     }
 
     private static bool UsesGroupedSidebar(MirageTwoColumnState state) =>
@@ -434,7 +661,8 @@ internal static class TwoColumnLayout
     private static void DrawSidebarNode(
         MirageTwoColumnState state,
         MirageTwoColumnSidebarNode node,
-        float scale)
+        float scale,
+        bool reorderEnabled)
     {
         switch (node)
         {
@@ -442,7 +670,7 @@ internal static class TwoColumnLayout
                 DrawListItem(state, page.Entry);
                 break;
             case MirageTwoColumnFolderNode folder:
-                DrawFolderNode(state, folder, scale);
+                DrawFolderNode(state, folder, scale, reorderEnabled);
                 break;
         }
     }
@@ -450,32 +678,136 @@ internal static class TwoColumnLayout
     private static void DrawFolderNode(
         MirageTwoColumnState state,
         MirageTwoColumnFolderNode folder,
-        float scale)
+        float scale,
+        bool reorderEnabled)
     {
         using var folderId = ImRaii.PushId(folder.Id);
 
-        var rowStartY = MirageLayout.Cursor.Y;
-        var rowHeight = MirageLayout.Style.FrameHeight;
-        var forceExpanded = HasActiveSearch(state);
-        var expanded = forceExpanded || !state.CollapsedFolderIds.Contains(folder.Id);
-
         ImGui.AlignTextToFramePadding();
-        if (ListSelectable.DrawFolderHeader(folder.Label, expanded, rowHeight))
+        var rowStart = MirageLayout.Cursor.Position;
+        var contentAvailX = MirageLayout.Style.ContentRegionAvail.X;
+        var rowHeight = MirageUi.ResolveControlHeight();
+        var forceExpanded = HasActiveSearch(state);
+        var expanded = folder.AlwaysExpanded
+            || forceExpanded
+            || !state.CollapsedFolderIds.Contains(folder.Id);
+        var trailingWidth = MeasureTrailingActions(folder.TrailingActions, rowHeight);
+
+        if (ListSelectable.DrawFolderHeader(
+                folder.Label,
+                expanded,
+                rowHeight,
+                canCollapse: !folder.AlwaysExpanded,
+                trailingWidth: trailingWidth)
+            && !folder.AlwaysExpanded
+            && !forceExpanded)
         {
-            if (expanded && !forceExpanded)
+            if (expanded)
                 state.CollapsedFolderIds.Add(folder.Id);
             else
                 state.CollapsedFolderIds.Remove(folder.Id);
         }
 
-        MirageLayout.Cursor.Y = rowStartY + rowHeight + state.ItemSpacing * scale;
+        DrawTrailingActions(folder.TrailingActions, rowStart, contentAvailX, rowHeight);
+
+        MirageLayout.Cursor.Y = rowStart.Y + rowHeight + state.ItemSpacing * scale;
 
         if (!expanded)
             return;
 
         var indent = state.FolderPageIndent * scale;
-        foreach (var entry in folder.Entries)
-            DrawListItem(state, entry, indent);
+        var rowBounds = new List<(string Id, float Top, float Bottom, int Index)>(folder.Entries.Count);
+        for (var i = 0; i < folder.Entries.Count; i++)
+        {
+            var entry = folder.Entries[i];
+            var top = MirageLayout.Cursor.ScreenPosition.Y;
+            DrawListItem(state, entry, indent, reorderEnabled);
+            var bottom = top + MirageLayout.Style.FrameHeight;
+            rowBounds.Add((entry.Id, top, bottom, i));
+        }
+
+        // Reorder only within this folder; ignore drops when drag is from another folder.
+        if (!reorderEnabled
+            || string.IsNullOrEmpty(state.EntryReorderDragId)
+            || rowBounds.FindIndex(r => string.Equals(r.Id, state.EntryReorderDragId, StringComparison.Ordinal)) < 0)
+            return;
+
+        UpdateEntryReorder(state, rowBounds, scale);
+    }
+
+    private static float MeasureTrailingActions(
+        IList<MirageTwoColumnTrailingAction>? actions,
+        float rowHeight)
+    {
+        if (actions == null || actions.Count == 0)
+            return 0f;
+
+        var gap = MirageLayout.Style.ItemInnerSpacing.X;
+        return (actions.Count * rowHeight) + ((actions.Count - 1) * gap) + gap;
+    }
+
+    private static void DrawTrailingActions(
+        IList<MirageTwoColumnTrailingAction>? actions,
+        Vector2 rowStart,
+        float contentAvailX,
+        float rowHeight)
+    {
+        if (actions == null || actions.Count == 0)
+            return;
+
+        var gap = MirageLayout.Style.ItemInnerSpacing.X;
+        var totalWidth = MeasureTrailingActions(actions, rowHeight);
+        // Window-local coords (same space as Cursor.Position / ContentRegionAvail).
+        var startX = rowStart.X + contentAvailX - 12f - totalWidth + gap;
+        MirageLayout.Cursor.Position = new Vector2(startX, rowStart.Y);
+
+        for (var i = 0; i < actions.Count; i++)
+        {
+            var action = actions[i];
+            using var actionId = ImRaii.PushId(action.Id);
+            if (MirageUi.IconButton(
+                    action.Icon,
+                    "##trail",
+                    new Vector2(rowHeight, rowHeight),
+                    tooltip: action.Tooltip))
+            {
+                if (action.ContextMenuItems.Count > 0)
+                    ImGui.OpenPopup("##TrailContext");
+                else
+                    action.OnClick?.Invoke();
+            }
+
+            DrawRowTrailingActionContextMenu(action);
+
+            if (i < actions.Count - 1)
+                ImGui.SameLine(0, gap);
+        }
+    }
+
+    private static void DrawRowTrailingActionContextMenu(MirageTwoColumnTrailingAction action)
+    {
+        if (action.ContextMenuItems.Count == 0)
+            return;
+
+        var labels = new string[action.ContextMenuItems.Count];
+        for (var i = 0; i < action.ContextMenuItems.Count; i++)
+            labels[i] = action.ContextMenuItems[i].Label;
+
+        var style = MirageContextMenuStyle.CreateDefault();
+        if (!MirageUi.ContextMenu.Begin("##TrailContext", labels, style))
+            return;
+
+        foreach (var item in action.ContextMenuItems)
+        {
+            var icon = item.Icon ?? FontAwesomeIcon.Circle;
+            if (!MirageUi.ContextMenu.DrawItem(item.Label, icon, item.Id, style))
+                continue;
+
+            item.OnClick?.Invoke();
+            ImGui.CloseCurrentPopup();
+        }
+
+        MirageUi.ContextMenu.End();
     }
 
     private static bool HasActiveSearch(MirageTwoColumnState state) =>
@@ -516,6 +848,8 @@ internal static class TwoColumnLayout
                         Id = folder.Id,
                         Label = folder.Label,
                         Entries = matchingEntries,
+                        AlwaysExpanded = folder.AlwaysExpanded,
+                        TrailingActions = folder.TrailingActions,
                     };
                     break;
             }
@@ -525,7 +859,7 @@ internal static class TwoColumnLayout
     private static bool IsFolderVisible(MirageTwoColumnState state, bool hasSearch, MirageTwoColumnFolderNode folder)
     {
         if (!hasSearch || string.IsNullOrWhiteSpace(state.SearchFilter))
-            return folder.Entries.Count > 0;
+            return folder.AlwaysExpanded || folder.Entries.Count > 0;
 
         if (MirageUi.MatchesFilter(folder.Id, folder.Label, state.SearchFilter))
             return true;
@@ -586,16 +920,19 @@ internal static class TwoColumnLayout
     private static void DrawListItem(
         MirageTwoColumnState state,
         MirageTwoColumnEntry entry,
-        float indent = 0f)
+        float indent = 0f,
+        bool reorderEnabled = false)
     {
         using var entryId = ImRaii.PushId(entry.Id);
 
-        var rowStartY = MirageLayout.Cursor.Y;
-        var rowHeight = MirageLayout.Style.FrameHeight;
+        ImGui.AlignTextToFramePadding();
+        var rowStart = MirageLayout.Cursor.Position;
+        var contentAvailX = MirageLayout.Style.ContentRegionAvail.X;
+        var rowHeight = MirageUi.ResolveControlHeight();
         var kind = ResolveEntryKind(state, entry);
         var hasLeadingControl = kind is MirageTwoColumnEntryKind.Bool or MirageTwoColumnEntryKind.Run;
-
-        ImGui.AlignTextToFramePadding();
+        var isDragSource = reorderEnabled
+            && string.Equals(state.EntryReorderDragId, entry.Id, StringComparison.Ordinal);
 
         var labelIndent = hasLeadingControl ? 0f : indent;
 
@@ -634,10 +971,35 @@ internal static class TwoColumnLayout
             ImGui.SameLine(0, MirageLayout.Style.ItemInnerSpacing.X);
         }
 
+        var trailingWidth = MeasureTrailingActions(entry.TrailingActions, rowHeight);
         var isSelected = state.SelectedId == entry.Id;
-        if (ListSelectable.Draw(entry.Label, isSelected, rowHeight, labelIndent))
+        var pressed = ListSelectable.Draw(
+            entry.Label,
+            isSelected,
+            rowHeight,
+            labelIndent,
+            trailingWidth,
+            dimmed: isDragSource,
+            labelColor: entry.LabelColor);
+
+        if (reorderEnabled
+            && ImGui.IsItemActive()
+            && ImGui.IsMouseDragging(ImGuiMouseButton.Left, 5f)
+            && !string.Equals(state.EntryReorderDragId, entry.Id, StringComparison.Ordinal))
         {
-            var nextId = isSelected ? null : entry.Id;
+            state.EntryReorderDragId = entry.Id;
+            state.OnEntryReorderDragIdChanged?.Invoke(entry.Id);
+        }
+
+        // Ignore click-to-select once a reorder drag has started.
+        if (pressed && string.IsNullOrEmpty(state.EntryReorderDragId))
+        {
+            string? nextId;
+            if (isSelected && state.AllowDeselect)
+                nextId = null;
+            else
+                nextId = entry.Id;
+
             state.SelectedId = nextId;
             if (nextId != null)
                 state.OnSelectionChanged?.Invoke(nextId);
@@ -645,23 +1007,103 @@ internal static class TwoColumnLayout
                 state.OnSelectionChanged?.Invoke(string.Empty);
         }
 
+        if (entry.ContextMenuItems.Count > 0
+            && ImGui.IsItemHovered()
+            && ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+        {
+            state.SelectedId = entry.Id;
+            state.OnSelectionChanged?.Invoke(entry.Id);
+            ImGui.OpenPopup("##EntryContext");
+        }
+
+        DrawEntryContextMenu(entry);
+        DrawTrailingActions(entry.TrailingActions, rowStart, contentAvailX, rowHeight);
+
         if (isSelected && state.ScrollSelectedIntoView)
         {
             ImGui.SetScrollHereY();
             state.ScrollSelectedIntoView = false;
         }
 
-        MirageLayout.Cursor.Y = rowStartY + rowHeight + state.ItemSpacing * MirageLayout.Style.Scale;
+        MirageLayout.Cursor.Y = rowStart.Y + rowHeight + state.ItemSpacing * MirageLayout.Style.Scale;
     }
 
-    private static void DrawMainContent(MirageTwoColumnState state, float scale, Action drawMainContent)
+    private static void DrawEntryContextMenu(MirageTwoColumnEntry entry)
+    {
+        if (entry.ContextMenuItems.Count == 0)
+            return;
+
+        var labels = new string[entry.ContextMenuItems.Count];
+        for (var i = 0; i < entry.ContextMenuItems.Count; i++)
+            labels[i] = entry.ContextMenuItems[i].Label;
+
+        var style = MirageContextMenuStyle.CreateDefault();
+        if (!MirageUi.ContextMenu.Begin("##EntryContext", labels, style))
+            return;
+
+        foreach (var item in entry.ContextMenuItems)
+        {
+            var icon = item.Icon ?? FontAwesomeIcon.Circle;
+            if (!MirageUi.ContextMenu.DrawItem(item.Label, icon, item.Id, style))
+                continue;
+
+            item.OnClick?.Invoke();
+            ImGui.CloseCurrentPopup();
+        }
+
+        MirageUi.ContextMenu.End();
+    }
+
+    private static void DrawContentPanels(
+        MirageTwoColumnState state,
+        float scale,
+        Action drawCenterContent,
+        Action? drawRightContent)
+    {
+        var height = MirageLayout.Style.ContentRegionAvail.Y;
+        var availWidth = MirageLayout.Style.ContentRegionAvail.X;
+        if (drawRightContent == null)
+        {
+            DrawContentPanel(
+                state,
+                scale,
+                "##TwoColumnMain"u8,
+                new Vector2(availWidth, height),
+                drawCenterContent);
+            return;
+        }
+
+        // Center and right share the remaining width equally.
+        var panelWidth = availWidth * 0.5f;
+        var panelStart = MirageLayout.Cursor.Position;
+        DrawContentPanel(
+            state,
+            scale,
+            "##ThreeColumnCenter"u8,
+            new Vector2(panelWidth, height),
+            drawCenterContent);
+        MirageLayout.Cursor.Position = panelStart + new Vector2(panelWidth, 0f);
+        DrawContentPanel(
+            state,
+            scale,
+            "##ThreeColumnRight"u8,
+            new Vector2(Math.Max(1f, availWidth - panelWidth), height),
+            drawRightContent);
+    }
+
+    private static void DrawContentPanel(
+        MirageTwoColumnState state,
+        float scale,
+        ReadOnlySpan<byte> id,
+        Vector2 size,
+        Action drawContent)
     {
         using var style = ImRaii.PushStyle(ImGuiStyleVar.WindowPadding, state.MainPadding * scale);
-        using var child = ImRaii.Child("##TwoColumnMain"u8, new Vector2(-1), false, ImGuiWindowFlags.AlwaysUseWindowPadding);
+        using var child = ImRaii.Child(id, size, state.ShowDebugBorders, ImGuiWindowFlags.AlwaysUseWindowPadding);
         if (!child)
             return;
 
         style.Dispose();
-        drawMainContent();
+        drawContent();
     }
 }

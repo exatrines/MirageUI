@@ -54,7 +54,37 @@ public sealed class MirageTwoColumnState
 
     public bool ScrollSelectedIntoView { get; set; }
 
+    /// <summary>When false, clicking the already-selected entry keeps it selected.</summary>
+    public bool AllowDeselect { get; set; } = true;
+
+    /// <summary>
+    /// When true (default), changing the search filter selects the first visible entry.
+    /// Clearing the filter does not clear the current selection.
+    /// </summary>
+    public bool AutoSelectFirstOnSearch { get; set; } = true;
+
     public Action<string>? OnSelectionChanged { get; set; }
 
+    public Action<string>? OnSearchFilterChanged { get; set; }
+
+    /// <summary>Icon buttons drawn to the right of the search field (same row).</summary>
+    public IList<MirageTwoColumnTrailingAction> SearchTrailingActions { get; init; } = [];
+
     public Action<string, bool>? OnEnabledChanged { get; set; }
+
+    /// <summary>Enable drag-and-drop reorder for flat <see cref="Entries"/> or within each folder in <see cref="SidebarNodes"/>.</summary>
+    public bool EnableEntryReorder { get; set; }
+
+    /// <summary>Host-persisted id of the entry currently being dragged; null when idle.</summary>
+    public string? EntryReorderDragId { get; set; }
+
+    public Action<string?>? OnEntryReorderDragIdChanged { get; set; }
+
+    /// <summary>
+    /// Invoked on drop: dragged entry id and insert index in the active list
+    /// (flat <see cref="Entries"/>, or the folder that owns the drag when using <see cref="SidebarNodes"/>).
+    /// 0 = before first, Count = after last. Not a swap — caller should move/insert.
+    /// Cross-folder drops are ignored.
+    /// </summary>
+    public Action<string, int>? OnEntryReordered { get; set; }
 }

@@ -17,40 +17,6 @@ public static partial class MirageUi
         return changed;
     }
 
-    /// <summary>整数スライダー。</summary>
-    public static bool SliderInt(
-        string label,
-        ref int value,
-        int min,
-        int max,
-        float width = -1f,
-        string? hint = null,
-        Color hintColor = Color.Secondary)
-    {
-        SetControlWidth(width);
-        var changed = ImGui.SliderInt(label, ref value, min, max);
-        DrawControlHint(hint, hintColor);
-        return changed;
-    }
-
-    /// <summary>浮動小数スライダー。</summary>
-    public static bool SliderFloat(
-        string label,
-        ref float value,
-        float min,
-        float max,
-        float width = -1f,
-        string format = "%.1f",
-        string? hint = null,
-        Color hintColor = Color.Secondary)
-    {
-        value = Math.Clamp(value, min, max);
-        SetControlWidth(width);
-        var changed = ImGui.SliderFloat(label, ref value, min, max, format);
-        DrawControlHint(hint, hintColor);
-        return changed;
-    }
-
     /// <summary><paramref name="disabled"/> が true の間、子要素を無効化する。</summary>
     public static DisabledScope DisabledIf(bool disabled)
     {

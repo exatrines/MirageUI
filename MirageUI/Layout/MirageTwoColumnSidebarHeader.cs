@@ -14,8 +14,12 @@ public sealed class MirageTwoColumnSidebarHeader
 
     public string? Subtitle { get; init; }
 
+    /// <summary>Icon buttons at the bottom-right of the plugin info area (independent of title/subtitle centering).</summary>
+    public IList<MirageTwoColumnTrailingAction> TrailingActions { get; init; } = [];
+
     internal bool HasContent =>
         !string.IsNullOrWhiteSpace(ImagePath)
         || !string.IsNullOrWhiteSpace(Title)
-        || !string.IsNullOrWhiteSpace(Subtitle);
+        || !string.IsNullOrWhiteSpace(Subtitle)
+        || TrailingActions.Count > 0;
 }

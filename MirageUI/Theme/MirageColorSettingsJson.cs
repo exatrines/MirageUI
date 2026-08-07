@@ -73,6 +73,7 @@ public static class MirageColorSettingsJson
         public float[]? Accent { get; set; }
         public float[]? Title { get; set; }
         public float[]? Warning { get; set; }
+        public float[]? Info { get; set; }
         public float[]? PanelOverlay { get; set; }
 
         public float[]? Text { get; set; }
@@ -105,6 +106,7 @@ public static class MirageColorSettingsJson
                 Accent = ToArray(settings.GetColor(MirageUi.Color.Accent)),
                 Title = ToArray(settings.GetColor(MirageUi.Color.Title)),
                 Warning = ToArray(settings.GetColor(MirageUi.Color.Warning)),
+                Info = ToArray(settings.GetColor(MirageUi.Color.Info)),
                 PanelOverlay = ToArray(settings.GetColor(MirageUi.Color.PanelOverlay)),
                 TitleFontSizePt = settings.TitleFontSizePt,
                 UiFontSizePt = settings.UiFontSizePt,
@@ -134,6 +136,7 @@ public static class MirageColorSettingsJson
             settings.SetColor(MirageUi.Color.Accent, ToVector4(Accent ?? AccentEnabled));
             settings.SetColor(MirageUi.Color.Title, ToVector4(Title ?? AccentTitle));
             settings.SetColor(MirageUi.Color.Warning, ToVector4(Warning));
+            settings.SetColor(MirageUi.Color.Info, ToVector4(Info));
             settings.SetColor(MirageUi.Color.PanelOverlay, ToVector4(PanelOverlay ?? SidebarOverlay));
 
             return settings;

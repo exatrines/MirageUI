@@ -1,4 +1,5 @@
-﻿using Dalamud.Utility;
+using Dalamud.Interface;
+using Dalamud.Utility;
 using MirageUI.Theme;
 using MirageUI.Ui;
 
@@ -21,10 +22,42 @@ public static partial class MirageUi
         return label.Contains(trimmed, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static bool SearchFilter(ReadOnlySpan<byte> id, ref string filter, string hint, int maxLength = 256)
+    public static bool SearchFilter(
+        ReadOnlySpan<byte> id,
+        ref string filter,
+        string hint,
+        int maxLength = 256,
+        float width = -1f)
     {
-        ImGui.SetNextItemWidth(-1f);
-        return ImGui.InputTextWithHint(id, hint, ref filter, maxLength, ImGuiInputTextFlags.AutoSelectAll);
+        PushInputChrome();
+        try
+        {
+            ImGui.SetNextItemWidth(width);
+            return ImGui.InputTextWithHint(id, hint, ref filter, maxLength, ImGuiInputTextFlags.AutoSelectAll);
+        }
+        finally
+        {
+            PopInputChrome();
+        }
+    }
+
+    public static bool SearchFilter(
+        string id,
+        ref string filter,
+        string hint,
+        int maxLength = 256,
+        float width = -1f)
+    {
+        PushInputChrome();
+        try
+        {
+            ImGui.SetNextItemWidth(width);
+            return ImGui.InputTextWithHint(id, hint, ref filter, maxLength, ImGuiInputTextFlags.AutoSelectAll);
+        }
+        finally
+        {
+            PopInputChrome();
+        }
     }
 
     public static void PaddedSeparator()
@@ -47,6 +80,31 @@ public static partial class MirageUi
 
         using (PushFont(fontSize))
             DrawText(title, GetColor(color), wrap: false);
+
+        if (underline)
+            PaddedSeparator();
+    }
+
+    /// <summary>Title with trailing status text on the right + underline.</summary>
+    public static void HeaderWithStatus(
+        string title,
+        string status,
+        Color statusColor = Color.Secondary,
+        Color color = Color.Title,
+        FontSize fontSize = FontSize.Large,
+        bool underline = true)
+    {
+        MirageLayout.Cursor.Y += 5f * MirageLayout.Style.Scale;
+
+        using (PushFont(fontSize))
+        {
+            DrawText(title, GetColor(color), wrap: false);
+
+            var windowX = MirageLayout.Style.ContentRegionMax.X;
+            var textSize = ImGui.CalcTextSize(status);
+            ImGui.SameLine(windowX - textSize.X);
+            ImGui.TextColored(GetColor(statusColor), status);
+        }
 
         if (underline)
             PaddedSeparator();
@@ -110,17 +168,17 @@ public static partial class MirageUi
         }
 
         var buttonLabel = isRunning ? stopText : startText;
-        var framePadding = MirageLayout.Style.FramePadding;
+        var framePadding = ResolveInputFramePadding();
         var buttonPadding = new Vector2(
             framePadding.X + ButtonExtraPaddingX,
-            framePadding.Y + ButtonExtraPaddingY);
+            framePadding.Y);
         Vector2 labelSize;
         using (PushFont(FontSize.Default))
             labelSize = ImGui.CalcTextSize(buttonLabel);
 
         var buttonSize = new Vector2(
             labelSize.X + buttonPadding.X * 2f,
-            labelSize.Y + buttonPadding.Y * 2f);
+            ResolveControlHeight());
         var buttonX = MirageLayout.Style.ContentRegionMax.X - buttonSize.X;
         var buttonY = startCursor.Y + MathF.Max(0f, (titleHeight - buttonSize.Y) * 0.5f);
         MirageLayout.Cursor.Position = new Vector2(buttonX, buttonY);
@@ -205,6 +263,97 @@ public static partial class MirageUi
             DrawText(text, customColor, wrap, spaced, centered, underline);
     }
 
+    /// <summary>
+    /// Inline warning banner: [icon] + multiline message on a tinted background.
+    /// </summary>
+    public static void Warning(string message, float width = -1f) =>
+        Banner(FontAwesomeIcon.ExclamationTriangle, GetColor(Color.Warning), width, () =>
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, GetColor(Color.Warning));
+            ImGui.TextWrapped(message);
+            ImGui.PopStyleColor();
+        });
+
+    /// <summary>
+    /// Inline info banner: [InfoCircle] + multiline message on a light-blue tinted background.
+    /// </summary>
+    public static void Info(string message, float width = -1f) =>
+        Banner(FontAwesomeIcon.InfoCircle, GetColor(Color.Info), width, () =>
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, GetColor(Color.Info));
+            ImGui.TextWrapped(message);
+            ImGui.PopStyleColor();
+        });
+
+    /// <summary>
+    /// Inline info banner with custom content (e.g. link button + steps).
+    /// </summary>
+    public static void Info(Action drawContent, float width = -1f) =>
+        Banner(FontAwesomeIcon.InfoCircle, GetColor(Color.Info), width, drawContent);
+
+    private static void Banner(
+        FontAwesomeIcon icon,
+        Vector4 accent,
+        float width,
+        Action drawContent)
+    {
+        ArgumentNullException.ThrowIfNull(drawContent);
+
+        var scale = MirageLayout.Style.Scale;
+        var padding = 10f * scale;
+        var gap = 8f * scale;
+        var rounding = 4f * scale;
+        var avail = width > 0f ? width : MirageLayout.Style.ContentRegionAvail.X;
+        if (avail <= 0f)
+            return;
+
+        var bg = new Vector4(accent.X, accent.Y, accent.Z, 0.18f);
+        var border = new Vector4(accent.X, accent.Y, accent.Z, 0.55f);
+
+        ImGui.PushFont(UiBuilder.IconFont);
+        var iconText = icon.ToIconString();
+        var iconSize = ImGui.CalcTextSize(iconText);
+        ImGui.PopFont();
+
+        var contentWidth = Math.Max(1f, avail - padding * 2f - iconSize.X - gap);
+        var min = MirageLayout.Cursor.ScreenPosition;
+        var contentOrigin = new Vector2(
+            min.X + padding + iconSize.X + gap,
+            min.Y + padding);
+
+        var dl = ImGui.GetWindowDrawList();
+        dl.ChannelsSplit(2);
+        dl.ChannelsSetCurrent(1);
+
+        MirageLayout.Cursor.ScreenPosition = contentOrigin;
+        ImGui.PushItemWidth(contentWidth);
+        ImGui.PushTextWrapPos(contentOrigin.X + contentWidth);
+        drawContent();
+        ImGui.PopTextWrapPos();
+        ImGui.PopItemWidth();
+
+        var contentBottom = Math.Max(
+            MirageLayout.Cursor.ScreenPosition.Y,
+            ImGui.GetItemRectMax().Y);
+        var contentHeight = Math.Max(iconSize.Y, contentBottom - contentOrigin.Y);
+        var max = new Vector2(min.X + avail, min.Y + contentHeight + padding * 2f);
+
+        dl.ChannelsSetCurrent(0);
+        dl.AddRectFilled(min, max, ToUInt(bg), rounding);
+        dl.AddRect(min, max, ToUInt(border), rounding);
+
+        var iconPos = new Vector2(
+            min.X + padding,
+            min.Y + padding + (contentHeight - iconSize.Y) * 0.5f);
+        ImGui.PushFont(UiBuilder.IconFont);
+        dl.AddText(iconPos, ToUInt(accent), iconText);
+        ImGui.PopFont();
+        dl.ChannelsMerge();
+
+        MirageLayout.Cursor.ScreenPosition = new Vector2(min.X, max.Y);
+        MirageLayout.Cursor.Y += MirageLayout.Style.ItemSpacing.Y;
+    }
+
     public static void OverlayFill(Vector2 screenPos, Vector2 size, float rounding, ImDrawFlags flags = ImDrawFlags.None)
     {
         ImGui.GetWindowDrawList().AddRectFilled(
@@ -270,9 +419,6 @@ public static partial class MirageUi
         var active = WithAlpha(accent, 0.40f);
         return (baseBg, hovered, active, text, accent);
     }
-
-    private static Vector4 WithAlpha(Vector4 color, float alpha) =>
-        new(color.X, color.Y, color.Z, alpha);
 
     private static void DrawText(
         string text,
