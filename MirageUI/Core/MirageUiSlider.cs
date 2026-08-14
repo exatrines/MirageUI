@@ -13,12 +13,13 @@ public static partial class MirageUi
         float max,
         string format = "%.1f",
         string id = "",
-        float width = InputWidthFill)
+        float width = InputWidthFill,
+        float labelWidth = FieldLabelColumnWidth)
     {
         value = Math.Clamp(value, min, max);
 
         var fieldId = string.IsNullOrEmpty(id) ? label : id;
-        if (!BeginFieldRow(label, fieldId, out var usedTable))
+        if (!BeginFieldRow(label, fieldId, out var usedTable, labelWidth: labelWidth, controlWidth: width))
             return false;
 
         PushInputChrome();
@@ -45,12 +46,13 @@ public static partial class MirageUi
         int min,
         int max,
         string id = "",
-        float width = InputWidthFill)
+        float width = InputWidthFill,
+        float labelWidth = FieldLabelColumnWidth)
     {
         value = Math.Clamp(value, min, max);
 
         var fieldId = string.IsNullOrEmpty(id) ? label : id;
-        if (!BeginFieldRow(label, fieldId, out var usedTable))
+        if (!BeginFieldRow(label, fieldId, out var usedTable, labelWidth: labelWidth, controlWidth: width))
             return false;
 
         PushInputChrome();

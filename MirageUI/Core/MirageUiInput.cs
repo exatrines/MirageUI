@@ -18,10 +18,11 @@ public static partial class MirageUi
         string id = "",
         string? hint = null,
         float width = InputWidthFill,
-        ImGuiInputTextFlags flags = ImGuiInputTextFlags.None)
+        ImGuiInputTextFlags flags = ImGuiInputTextFlags.None,
+        float labelWidth = FieldLabelColumnWidth)
     {
         var fieldId = string.IsNullOrEmpty(id) ? label : id;
-        if (!BeginFieldRow(label, fieldId, out var usedTable))
+        if (!BeginFieldRow(label, fieldId, out var usedTable, labelWidth: labelWidth, controlWidth: width))
             return false;
 
         PushInputChrome();
@@ -51,10 +52,11 @@ public static partial class MirageUi
         string id = "",
         float width = InputWidthFill,
         bool? liveMatch = null,
-        string? matchTooltip = null)
+        string? matchTooltip = null,
+        float labelWidth = FieldLabelColumnWidth)
     {
         var fieldId = string.IsNullOrEmpty(id) ? label : id;
-        if (!BeginFieldRow(label, fieldId, out var usedTable, liveMatch, matchTooltip))
+        if (!BeginFieldRow(label, fieldId, out var usedTable, liveMatch, matchTooltip, labelWidth, width))
             return false;
 
         PushInputChrome();
@@ -81,10 +83,11 @@ public static partial class MirageUi
         float stepFast = 0f,
         string format = "%.3f",
         string id = "",
-        float width = InputWidthFill)
+        float width = InputWidthFill,
+        float labelWidth = FieldLabelColumnWidth)
     {
         var fieldId = string.IsNullOrEmpty(id) ? label : id;
-        if (!BeginFieldRow(label, fieldId, out var usedTable))
+        if (!BeginFieldRow(label, fieldId, out var usedTable, labelWidth: labelWidth, controlWidth: width))
             return false;
 
         PushInputChrome();
@@ -102,12 +105,13 @@ public static partial class MirageUi
     }
 
     /// <summary>
-    /// In a table field column, default to fill. Outside a table: fixed / half / fill as before.
+    /// In a table field column, fill that column (its width is already resolved by the row).
+    /// Outside a table: fixed / half / fill as before.
     /// </summary>
     private static float ResolveFieldControlWidth(float width, bool inFieldTable)
     {
         if (inFieldTable)
-            return width > 0f ? width : -1f;
+            return -1f;
 
         if (width > 0f)
             return width;

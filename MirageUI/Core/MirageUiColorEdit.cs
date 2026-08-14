@@ -11,10 +11,11 @@ public static partial class MirageUi
         ref Vector4 color,
         ImGuiColorEditFlags flags = ImGuiColorEditFlags.AlphaBar,
         string id = "",
-        float width = InputWidthFill)
+        float width = InputWidthFill,
+        float labelWidth = FieldLabelColumnWidth)
     {
         var fieldId = string.IsNullOrEmpty(id) ? label : id;
-        if (!BeginFieldRow(label, fieldId, out var usedTable))
+        if (!BeginFieldRow(label, fieldId, out var usedTable, labelWidth: labelWidth, controlWidth: width))
             return false;
 
         PushInputChrome();

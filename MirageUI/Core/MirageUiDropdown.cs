@@ -30,7 +30,8 @@ public static partial class MirageUi
         string? emptyMessage = null,
         float width = InputWidthFill,
         bool? liveMatch = null,
-        string? matchTooltip = null)
+        string? matchTooltip = null,
+        float labelWidth = FieldLabelColumnWidth)
     {
         var preview = string.IsNullOrWhiteSpace(selected)
             ? (placeholder ?? string.Empty)
@@ -43,7 +44,8 @@ public static partial class MirageUi
                 width,
                 hasValue: !string.IsNullOrWhiteSpace(selected),
                 liveMatch: liveMatch,
-                matchTooltip: matchTooltip))
+                matchTooltip: matchTooltip,
+                labelWidth: labelWidth))
             return false;
 
         var changed = DrawDropdownItems(ref selected, items, placeholder, allowClear, emptyMessage, filter: null);
@@ -71,7 +73,8 @@ public static partial class MirageUi
         string? headerButtonLabel = null,
         Action? onHeaderButton = null,
         bool? liveMatch = null,
-        string? matchTooltip = null)
+        string? matchTooltip = null,
+        float labelWidth = FieldLabelColumnWidth)
     {
         var preview = string.IsNullOrWhiteSpace(selected)
             ? (placeholder ?? string.Empty)
@@ -85,7 +88,8 @@ public static partial class MirageUi
                 hasValue: !string.IsNullOrWhiteSpace(selected),
                 comboFlags: ImGuiComboFlags.HeightLarge,
                 liveMatch: liveMatch,
-                matchTooltip: matchTooltip))
+                matchTooltip: matchTooltip,
+                labelWidth: labelWidth))
             return false;
 
         if (ImGui.IsWindowAppearing())
@@ -202,10 +206,11 @@ public static partial class MirageUi
         bool hasValue = true,
         ImGuiComboFlags comboFlags = ImGuiComboFlags.None,
         bool? liveMatch = null,
-        string? matchTooltip = null)
+        string? matchTooltip = null,
+        float labelWidth = FieldLabelColumnWidth)
     {
         var fieldId = string.IsNullOrEmpty(id) ? label : id;
-        if (!BeginFieldRow(label, fieldId, out var usedTable, liveMatch, matchTooltip))
+        if (!BeginFieldRow(label, fieldId, out var usedTable, liveMatch, matchTooltip, labelWidth, width))
             return false;
 
         var settings = MirageTheme.Active ?? MirageTheme.ResolveAppliedColors();

@@ -160,7 +160,7 @@ if (MirageUi.Button("Save", MirageUi.ButtonKind.Primary, width: 120f))
 ### Dropdown
 
 
-アクセントカラーのプルダウン。レイアウトは Table API の `[ラベル | プルダウン]`（左ラベル・右入力）。右列は残り幅いっぱい。
+アクセントカラーのプルダウン。1行をコンテンツ幅いっぱいにし、左ラベル（左寄せ）と右コントロール（固定時は右寄せ）の幅をそれぞれ指定できる。両方固定なら余りは中央、片方だけ固定ならもう片方が伸びる。既定はラベル 128・コントロールは残り幅。
 
 ```csharp
 var selected = "Paladin";
@@ -184,12 +184,13 @@ if (MirageUi.BeginDropdown("Job", preview, id: "job", hasValue: true))
 | `SearchableDropdown(..., ref searchFilter, ...)` | 検索付きプルダウン |
 | `BeginDropdown` / `EndDropdown` | カスタム項目用 |
 | `DropdownItem(label, selected)` | 項目（選択中はフォーカス） |
-| `FieldLabelColumnWidth` | 左ラベル列の固定幅 |
+| `FieldLabelColumnWidth` | 左ラベル列の既定固定幅（128）。`labelWidth: 0` でラベル側を伸縮 |
+| `labelWidth` / `width` | ラベル／コントロールの固定幅。`<= 0` はその側を伸縮 |
 
 ### Input
 
 
-アクセントカラーのテキスト／数値入力。レイアウトは Dropdown と同じ Table API の `[ラベル | 入力]`。
+アクセントカラーのテキスト／数値入力。レイアウトは Dropdown と同じ（行幅 100%、`labelWidth` / `width`）。
 
 ```csharp
 var name = "Untitled";
