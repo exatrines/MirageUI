@@ -8,7 +8,7 @@ namespace MirageUI;
 
 internal static class ImageRegistry
 {
-    private static readonly ConcurrentDictionary<string, ISharedImmediateTexture> Textures = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, ISharedImmediateTexture?> Textures = new(StringComparer.OrdinalIgnoreCase);
 
     private static ITextureProvider? _textureProvider;
 
@@ -22,7 +22,7 @@ internal static class ImageRegistry
             return false;
 
         var shared = Textures.GetOrAdd(path, LoadTexture);
-        var texture = shared.GetWrapOrDefault();
+        var texture = shared?.GetWrapOrDefault();
         if (texture == null)
             return false;
 
@@ -32,14 +32,27 @@ internal static class ImageRegistry
 
     internal static bool TryGetGameIcon(uint iconId, bool hiRes, out IDalamudTextureWrap wrap)
     {
+        if (TryLoadGameIcon(iconId, hiRes, out wrap))
+            return true;
+
+        return hiRes && TryLoadGameIcon(iconId, hiRes: false, out wrap);
+    }
+
+    private static bool TryLoadGameIcon(uint iconId, bool hiRes, out IDalamudTextureWrap wrap)
+    {
         wrap = null!;
         if (_textureProvider == null || iconId == 0)
             return false;
 
         var key = $"gameicon:{iconId}:{(hiRes ? "hr" : "lr")}";
         var shared = Textures.GetOrAdd(key, _ =>
-            _textureProvider.GetFromGameIcon(new GameIconLookup(iconId, itemHq: false, hiRes: hiRes)));
-        var texture = shared.GetWrapOrDefault();
+        {
+            var lookup = new GameIconLookup(iconId, itemHq: false, hiRes: hiRes);
+            return _textureProvider.TryGetFromGameIcon(lookup, out var texture)
+                ? texture
+                : null;
+        });
+        var texture = shared?.GetWrapOrDefault();
         if (texture == null)
             return false;
 
