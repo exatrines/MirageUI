@@ -39,7 +39,7 @@ public sealed class Plugin : IDalamudPlugin
 ```
 
 - `ConfigureTheme` … 適用する配色を指定するデリゲート
-- `Init` … フォント・画像レジストリの初期化。`Image` を使う場合は `ITextureProvider`、`IPluginLog` を渡す
+- `Init` … フォント・画像レジストリの初期化。`Image` を使う場合は `ITextureProvider`、`IPluginLog` を渡す。プラグインページもここで用意する
 - `Dispose` … リソース解放
 
 ウィンドウでテーマを適用する例:
@@ -54,6 +54,10 @@ public override void PreDraw()
 public override void PostDraw() => MirageTheme.Pop(_colorScope);
 ```
 
+`MirageWindowDefaults.ApplyTo` はタイトルバーにプラグインページボタンを付ける（既定は Ghost）。クリックで TwoColumn の右カラムにプラグインページを出す。アイコンは `MirageUi.ConfigurePluginInfo(info => info.TitleBarIcon = …)` で変更する（ウィンドウ生成前）。Dalamud の IconFont は Font Awesome Free Solid のみなので、Snapchat などの Brands アイコンは指定できない。
+
+サイドバーのプラグインアイコンをクリックすると、TwoColumn の右カラムにプラグインページをトグルする。ページ中央にアイコン、プラグイン名、バージョン、`by author` を出す。任意メッセージと Discord / Support URL は `MirageUi.ConfigurePluginInfo` でプラグイン側が渡す（空なら出さない）。GitHub はマニフェストの `RepoUrl`。サイドバー項目をクリックすると元のページに戻る。
+
 ## 公開 API 一覧
 
 | 型 | 説明 |
@@ -66,7 +70,8 @@ public override void PostDraw() => MirageTheme.Pop(_colorScope);
 | `MirageMessageButton` | Message ダイアログボタン |
 | `MirageTwoColumnState` | 2 カラムレイアウトの状態 |
 | `MirageTwoColumnEntry` | 左カラムのリスト項目 |
-| `MirageTwoColumnSidebarHeader` | 左カラムのプラグイン情報 |
+| `MirageTwoColumnSidebarHeader` | 左カラムのプラグイン情報（アイコンクリックでプラグインページ） |
+| `MiragePluginInfo` | プラグインページの表示内容（名前・版・パブリッシャー・メッセージ・URL） |
 | `MirageTwoColumnSearchPosition` | 検索バーの位置（`Top` / `Bottom`） |
 | `MirageLayout` | ImGui レイアウト補助（`Style`, `Cursor` 等） |
 

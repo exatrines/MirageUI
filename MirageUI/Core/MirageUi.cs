@@ -71,10 +71,12 @@ public static partial class MirageUi
         FontRegistry.Init();
         if (textureProvider != null)
             ImageRegistry.Init(textureProvider);
+        InitPluginPage();
     }
 
     public static void Dispose()
     {
+        DisposePluginPage();
         ImageRegistry.Dispose();
         FontRegistry.Dispose();
     }

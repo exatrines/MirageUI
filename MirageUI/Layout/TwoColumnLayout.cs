@@ -9,6 +9,22 @@ internal static class TwoColumnLayout
         Action drawMainContent,
         Action? drawRightContent = null)
     {
+        MiragePluginPage.BeginHost();
+        try
+        {
+            DrawHost(state, drawMainContent, drawRightContent);
+        }
+        finally
+        {
+            MiragePluginPage.EndHost();
+        }
+    }
+
+    private static void DrawHost(
+        MirageTwoColumnState state,
+        Action drawMainContent,
+        Action? drawRightContent)
+    {
         var scale = MirageLayout.Style.Scale;
         var startPos = MirageLayout.Cursor.Position;
 
@@ -279,7 +295,17 @@ internal static class TwoColumnLayout
         var contentStart = MirageLayout.Cursor.Position;
 
         if (hasImage)
-            MirageUi.Image(header.ImagePath!, imageWidth, imageHeight, header.ImageIsCircle);
+        {
+            var drawn = MirageUi.Image(header.ImagePath!, imageWidth, imageHeight, header.ImageIsCircle);
+            if (!drawn)
+                ImGui.Dummy(new Vector2(imageWidth, imageHeight));
+
+            if (ImGui.IsItemClicked())
+                MirageUi.TogglePluginPage();
+            if (ImGui.IsItemHovered())
+                ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
+            MirageUi.Tooltip("Plugin page");
+        }
 
         if (hasText)
         {
@@ -517,6 +543,7 @@ internal static class TwoColumnLayout
             return;
 
         state.SelectedId = firstEntry.Id;
+        MiragePluginPage.Hide();
         state.OnSelectionChanged?.Invoke(firstEntry.Id);
     }
 
@@ -994,6 +1021,11 @@ internal static class TwoColumnLayout
         // Ignore click-to-select once a reorder drag has started.
         if (pressed && string.IsNullOrEmpty(state.EntryReorderDragId))
         {
+            var pluginPageWasVisible = MiragePluginPage.IsVisible;
+            MiragePluginPage.Hide();
+            if (pluginPageWasVisible && isSelected)
+                return;
+
             string? nextId;
             if (isSelected && state.AllowDeselect)
                 nextId = null;
@@ -1012,6 +1044,7 @@ internal static class TwoColumnLayout
             && ImGui.IsMouseClicked(ImGuiMouseButton.Right))
         {
             state.SelectedId = entry.Id;
+            MiragePluginPage.Hide();
             state.OnSelectionChanged?.Invoke(entry.Id);
             ImGui.OpenPopup("##EntryContext");
         }
@@ -1062,6 +1095,16 @@ internal static class TwoColumnLayout
     {
         var height = MirageLayout.Style.ContentRegionAvail.Y;
         var availWidth = MirageLayout.Style.ContentRegionAvail.X;
+        if (MiragePluginPage.IsVisible)
+        {
+            DrawContentPanel(
+                state,
+                scale,
+                "##TwoColumnMain"u8,
+                new Vector2(availWidth, height),
+                MiragePluginPage.Draw);
+            return;
+        }
         if (drawRightContent == null)
         {
             DrawContentPanel(
