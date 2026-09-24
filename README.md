@@ -54,7 +54,7 @@ public override void PreDraw()
 public override void PostDraw() => MirageTheme.Pop(_colorScope);
 ```
 
-`MirageWindowDefaults.ApplyTo` はタイトルバーにプラグインページボタンを付ける（既定は Ghost）。クリックで TwoColumn の右カラムにプラグインページを出す。アイコンは `MirageUi.ConfigurePluginInfo(info => info.TitleBarIcon = …)` で変更する（ウィンドウ生成前）。Dalamud の IconFont は Font Awesome Free Solid のみなので、Snapchat などの Brands アイコンは指定できない。
+`MirageWindowDefaults.ApplyTo` はタイトルバーにプラグインページボタンを付ける（既定は Heart）。クリックで TwoColumn の右カラムにプラグインページを出す。アイコンは `MirageUi.ConfigurePluginInfo(info => info.TitleBarIcon = …)` で変更する（ウィンドウ生成前）。Dalamud の IconFont は Font Awesome Free Solid のみなので、Snapchat などの Brands アイコンは指定できない。
 
 サイドバーのプラグインアイコンをクリックすると、TwoColumn の右カラムにプラグインページをトグルする。ページ中央にアイコン、プラグイン名、バージョン、`by author` を出す。任意メッセージと Discord / Support URL は `MirageUi.ConfigurePluginInfo` でプラグイン側が渡す（空なら出さない）。GitHub はマニフェストの `RepoUrl`。サイドバー項目をクリックすると元のページに戻る。
 

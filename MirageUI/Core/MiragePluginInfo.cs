@@ -22,7 +22,7 @@ public sealed class MiragePluginInfo
 
     public string? DiscordUrl { get; set; }
 
-    public FontAwesomeIcon TitleBarIcon { get; set; } = FontAwesomeIcon.Ghost;
+    public FontAwesomeIcon TitleBarIcon { get; set; } = FontAwesomeIcon.Heart;
 
     public static MiragePluginInfo FromPluginInterface(IDalamudPluginInterface pluginInterface)
     {
