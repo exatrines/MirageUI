@@ -225,6 +225,10 @@ public static partial class MirageUi
     public static bool Checkbox(string label, ref bool value) =>
         ImGui.Checkbox(label, ref value);
 
+    /// <summary>ラジオボタン。</summary>
+    public static bool Radio(string label, ref int current, int value) =>
+        ImGui.RadioButton(label, ref current, value);
+
     /// <summary>
     /// チェックボックスの直下から <see cref="CheckboxGroupScope"/> の Dispose までをインデントする。
     /// 説明文や子コントロールは <c>using</c> ブロック内に描画する。

@@ -223,6 +223,10 @@ MirageUi.InputFloat(string.Empty, ref time, format: "%.1f", id: "time", width: M
 | API | 説明 |
 | --- | --- |
 | `PaddedSeparator()` | 上下に余白を持つ区切り線 |
+| `Checkbox(label, ref value)` | チェックボックス |
+| `CheckboxGroup(label, ref value)` | チェック直下をインデント（`using` で解除） |
+| `Radio(label, ref current, value)` | ラジオボタン |
+| `DisabledIf(disabled)` | 子を無効化（`using` で解除） |
 | `SearchFilter(id, ref filter, hint, maxLength)` | 全幅検索入力欄 |
 | `MatchesFilter(key, label, filter)` | エントリの絞り込み判定 |
 | `OverlayFill(screenPos, size, rounding, flags)` | 背景塗りつぶし |
