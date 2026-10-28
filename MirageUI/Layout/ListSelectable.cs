@@ -78,7 +78,6 @@ internal static class ListSelectable
         return pressed;
     }
 
-    /// <returns>True when the header was clicked and toggling is allowed.</returns>
     internal static bool DrawFolderHeader(
         string label,
         bool expanded,

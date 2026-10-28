@@ -2,7 +2,6 @@ namespace MirageUI.Layout;
 
 using Dalamud.Interface;
 
-/// <summary>Context-menu item for a sidebar entry (right-click).</summary>
 public sealed class MirageTwoColumnContextMenuItem
 {
     public required string Id { get; init; }

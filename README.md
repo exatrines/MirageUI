@@ -1,24 +1,32 @@
 # MirageUI
 
-Dalamud プラグイン向けの ImGui UI キット。テキスト・テーマ・2 カラムレイアウトを統一した API で提供する。
+[Japanese](README.ja.md)
 
-**公開 API はすべて `Mirage*` プレフィックス付きです。**
+![MirageUI](docs/screenshots/hero-1280x720.png)
+
+An ImGui-based UI library for Dalamud plugins. It manages text rendering, theming, window structures, and two-column layouts. The current version is 2.0.0.
+
+**Public API names start with `Mirage`.**
 
 ```csharp
 global using MirageUI;
-global using static MirageUI.Ui.MirageLayout;  // Style, Cursor 等
+global using static MirageUI.Ui.MirageLayout;  // Style, Cursor, etc.
 ```
 
-## 目次
+## Contents
 
-- [初期化](#初期化)
-- [公開 API 一覧](#公開-api-一覧)
-- [MirageUi](#mirageui)
-- [MirageUi.TwoColumn](#mirageuitwocolumn)
-- [MirageTheme](#miragetheme)
-- [MirageLayout](#miragelayout)
+- [Setup](#setup)
+- [Window](#window)
+- [Plugin Page](#plugin-page)
+- [Language](#language)
+- [Two Columns](#two-columns)
+- [Widgets](#widgets)
+- [Theme](#theme)
+- [Layout](#layout)
 
-## 初期化
+## Setup
+
+First, pass color settings via `ConfigureTheme`, then call `Init`. `Init` prepares fonts, images, MirageUI strings, and the plugin page. Pass `ITextureProvider` when using `Image`.
 
 ```csharp
 using Dalamud.Plugin;
@@ -34,315 +42,254 @@ public sealed class Plugin : IDalamudPlugin
         MirageUi.Init(pluginInterface, textureProvider, log);
     }
 
-    public void Dispose() => MirageUi.Dispose();
+    public void Dispose()
+    {
+        MirageWindowCapture.Dispose();
+        MirageUi.Dispose();
+    }
 }
 ```
 
-- `ConfigureTheme` … 適用する配色を指定するデリゲート
-- `Init` … フォント・画像レジストリの初期化。`Image` を使う場合は `ITextureProvider`、`IPluginLog` を渡す。プラグインページもここで用意する
-- `Dispose` … リソース解放
-
-ウィンドウでテーマを適用する例:
+In the window, apply colors before drawing and restore them afterward. Copy the screenshot in `PostDraw`.
 
 ```csharp
-public override void PreDraw()
-{
-    MirageTheme.EnsureDefaultsCaptured();
+public override void PreDraw() =>
     _colorScope = MirageTheme.PushCustom(MirageTheme.ResolveAppliedColors());
-}
 
-public override void PostDraw() => MirageTheme.Pop(_colorScope);
+public override void PostDraw()
+{
+    MirageWindowCapture.Copy();
+    MirageTheme.Pop(_colorScope);
+}
 ```
 
-`MirageWindowDefaults.ApplyTo` はタイトルバーにプラグインページボタンを付ける（既定は Heart）。クリックで TwoColumn の右カラムにプラグインページを出す。アイコンは `MirageUi.ConfigurePluginInfo(info => info.TitleBarIcon = …)` で変更する（ウィンドウ生成前）。Dalamud の IconFont は Font Awesome Free Solid のみなので、Snapchat などの Brands アイコンは指定できない。
+## Window
 
-サイドバーのプラグインアイコンをクリックすると、TwoColumn の右カラムにプラグインページをトグルする。ページ中央にアイコン、プラグイン名、バージョン、`by author` を出す。任意メッセージと Discord / Support URL は `MirageUi.ConfigurePluginInfo` でプラグイン側が渡す（空なら出さない）。GitHub はマニフェストの `RepoUrl`。サイドバー項目をクリックすると元のページに戻る。
+`MirageWindowHeader` renders the title bar and the left rail. The menu, collapse, close, and rail expand buttons remain fixed. Any other button can be added as a `MirageWindowFeature`.
 
-## 公開 API 一覧
-
-| 型 | 説明 |
-| --- | --- |
-| `MirageUi` | UI 描画ヘルパー |
-| `MirageTheme` | テーマ（配色）管理 |
-| `MirageColorSettings` | テーマ配色設定 |
-| `MirageColorSettingsJson` | 配色 JSON 入出力 |
-| `MirageMessageState` | Message ダイアログ状態 |
-| `MirageMessageButton` | Message ダイアログボタン |
-| `MirageTwoColumnState` | 2 カラムレイアウトの状態 |
-| `MirageTwoColumnEntry` | 左カラムのリスト項目 |
-| `MirageTwoColumnSidebarHeader` | 左カラムのプラグイン情報（アイコンクリックでプラグインページ） |
-| `MiragePluginInfo` | プラグインページの表示内容（名前・版・パブリッシャー・メッセージ・URL） |
-| `MirageTwoColumnSearchPosition` | 検索バーの位置（`Top` / `Bottom`） |
-| `MirageLayout` | ImGui レイアウト補助（`Style`, `Cursor` 等） |
-
-## MirageUi
-
-### Text
-
-| メソッド | 用途 | 既定 `color` | 既定 `fontSize` | 既定 `underline` |
-| --- | --- | --- | --- | --- |
-| `Header` | 大見出し | `Color.Title` | `FontSize.Large` | `true` |
-| `HeaderWithBool` | 右端 ON/OFF 付き見出し | `Color.Title` | `FontSize.Large` | `true` |
-| `HeaderWithRunToggle` | 右端 Start/Stop トグル付き見出し | `Color.Title` | `FontSize.Large` | `true` |
-| `SubHeader` | 小見出し | `Color.Title` | `FontSize.Default` | `true` |
-| `Text` | 本文 | `Color.Default` | `FontSize.Default` | `false` |
+Page entries are provided as a `Section` list in the order specified. This list is separate from the feature buttons.
 
 ```csharp
-MirageUi.Header("タイトル");
-MirageUi.HeaderWithBool("機能名", true, trueText: "ON", falseText: "OFF");
-if (MirageUi.HeaderWithRunToggle("Auto Tribe", isRunning))
+var sections = new MirageWindowHeader.Section[]
 {
-    // Start or Stop clicked
-}
-MirageUi.SubHeader("設定");
-MirageUi.Text("説明文", color: MirageUi.Color.Secondary);
+    new("modules", "Modules", FontAwesomeIcon.ThLarge),
+};
+
+var features = new MirageWindowFeature[]
+{
+    new()
+    {
+        Id = "plugin",
+        PageId = "plugin",
+        Icon = FontAwesomeIcon.Heart,
+        ShowOnTitle = true,
+        TitleKind = MirageWindowFeatureKind.OpenPage,
+        TitleOrder = 0,
+    },
+};
+
+var rail = MirageWindowHeader.RailWidth(railCollapsed, sections, features);
+MirageWindowHeader.Draw(this, title, ref collapsed, leftInset: 0f, ref pageId, features);
+MirageWindowHeader.DrawRail(sections, ref pageId, ref railCollapsed, showSections: !collapsed, features);
 ```
 
-`MirageUi.Color`: `Default`, `Secondary`, `Accent`, `Title`, `Warning`, `PanelOverlay`
+Configure each feature using the fields below:
 
-### Image
+| Field | Description / Value |
+| --- | --- |
+| Page | Set `PageId`. If empty, no page is associated |
+| Title | `ShowOnTitle`. `TitleKind` can be `OpenPage` or `Shortcut` |
+| Title footer | When set to `Shortcut` and `TitleOpensPage` is enabled, shows a row that opens the settings page |
+| Rail | `ShowOnRail`. `RailWhen` can be `Collapsed`, `Expanded`, or `Both` |
+| Rail kind | `RailKind` |
+| Rail footer | When set to `Shortcut` and `RailOpensPage` is enabled, shows a row that opens the settings page |
+
+`OpenPage` and the footer apply only when `PageId` is set. Opening a page from the title bar expands the window, whereas opening it from the rail only updates the active selection.
+
+Display order is determined by `TitleOrder` and `RailOrder`. Smaller numbers appear first. Equal values preserve the order in which they were passed. Provide an `Icon` if the button should be displayed. Render shortcut popup content using `DrawPopup`, specify width with `PopupTextWidth`, and draw each row with `MirageWindowHeader.PopupRow`.
+
+Rail labels can be omitted. If all labels are empty, icons are arranged in a single horizontal row. If any label is present, buttons are stacked vertically. While collapsed, only the icons are displayed vertically in the same order.
+
+Dalamud's IconFont only supports Font Awesome Free Solid. Brand icons are not supported.
+
+## Plugin Page
+
+`Init` automatically populates the name, author, version, GitHub URL, and `Data/plugin-icon.png` from the plugin manifest. Additional details like the message, Discord, and Support URLs can be configured using `ConfigurePluginInfo`. Empty rows are omitted.
+
+The default page centers the name, version, `by author`, message, and links. When `Data/plugin-icon.png` is present, the icon is centered above them. When it is missing, that space is omitted. By passing a custom draw callback to `SetPluginPage`, `DrawPluginPage` will render the entire page using that callback. Pass `null` to restore the default layout.
+
+Without the image, the left rail mark uses `TitleBarIcon`. The default is `FontAwesomeIcon.Heart`. Set another icon through `ConfigurePluginInfo`.
+
+The two-column overlay opened by `TogglePluginPage` or `OpenPluginPage` does not use `SetPluginPage`. It draws the default page.
 
 ```csharp
-MirageUi.Image(path, width, height, isCircle: true);
+MirageUi.ConfigurePluginInfo(info =>
+{
+    info.Message = "Short note.";
+    info.DiscordUrl = "https://discord.example";
+});
+
+MirageUi.SetPluginPage(() =>
+{
+    MirageUi.Header("Plugin");
+});
 ```
 
-ローカルファイルパスの画像を表示する。テクスチャ未ロード時は `false` を返す。
+## Language
 
-### Message
+Supports English and Japanese. `SetLanguage` selects Japanese only when the language code starts with `ja`; any other code defaults to English. This setting does not automatically follow Dalamud's language configuration.
 
-中央モーダル。`bool` / `MirageMessageState.Visible` で表示切替。ウィンドウ全体に半透明グレーをかぶせ、その上にメッセージを表示する。
+`Init` loads the built-in MirageUI strings. Register your plugin's strings afterward using `Register` or `RegisterEmbedded`. If duplicate keys exist, the latest value takes precedence. If a Japanese key is missing, it falls back to English. If the English key is also missing, the key itself is returned.
+
+Logical names for embedded resources should follow `{prefix}.en.json` and `{prefix}.ja.json`.
 
 ```csharp
-var message = new MirageMessageState();
-
-// 表示
-message.Show(
-    "Confirm",
-    "Run Auto Tribe now?",
-    FontAwesomeIcon.QuestionCircle,
-    new MirageMessageButton { Label = "Cancel" },
-    new MirageMessageButton { Label = "OK", Primary = true, OnClick = Start });
-
-// ホストウィンドウ Draw の末尾
-MirageUi.Message.Draw(message);
-
-// または
-MirageUi.Message.Draw(ref visible, "Title", "Body", FontAwesomeIcon.InfoCircle,
-    new MirageMessageButton { Label = "OK", Primary = true, OnClick = () => { } });
+MirageUi.I18n.SetLanguage("ja");
+MirageUi.I18n.RegisterEmbedded(typeof(Plugin).Assembly, "MyPlugin.Localization");
+var label = MirageUi.I18n.Get("nav.modules");
 ```
 
-| API | 説明 |
-| --- | --- |
-| `Message.Draw(state)` | State の Visible で表示 |
-| `Message.Draw(ref visible, title, message, icon, buttons)` | bool で表示 |
-| `MirageMessageButton` | ラベル / OnClick / Primary / CloseOnClick（最大 3） |
+## Two Columns
 
-### Button
-
-Accent-styled action button. `Primary` is filled stronger; `Secondary` is lighter.
-
-```csharp
-if (MirageUi.PrimaryButton("Change Gearset", enabled: selected >= 0))
-{
-    // clicked
-}
-
-if (MirageUi.SecondaryButton("Cancel"))
-{
-}
-
-if (MirageUi.Button("Save", MirageUi.ButtonKind.Primary, width: 120f))
-{
-}
-```
-
-| API | Description |
-| --- | --- |
-| `Button(label, kind, ...)` | Primary / Secondary |
-| `PrimaryButton` / `SecondaryButton` | Shortcuts |
-| `width` | `0` = auto size; `> 0` = fixed width |
-
-### Dropdown
-
-
-アクセントカラーのプルダウン。1行をコンテンツ幅いっぱいにし、左ラベル（左寄せ）と右コントロール（固定時は右寄せ）の幅をそれぞれ指定できる。両方固定なら余りは中央、片方だけ固定ならもう片方が伸びる。既定はラベル 128・コントロールは残り幅。
-
-```csharp
-var selected = "Paladin";
-if (MirageUi.Dropdown("Battle", ref selected, gearsetNames, placeholder: "(not set)"))
-{
-    // 選択変更
-}
-
-// カスタム項目
-if (MirageUi.BeginDropdown("Job", preview, id: "job", hasValue: true))
-{
-    if (MirageUi.DropdownItem("Paladin", selected == "Paladin"))
-        selected = "Paladin";
-    MirageUi.EndDropdown();
-}
-```
-
-| API | 説明 |
-| --- | --- |
-| `Dropdown(label, ref selected, items, ...)` | 文字列リストのプルダウン |
-| `SearchableDropdown(..., ref searchFilter, ...)` | 検索付きプルダウン |
-| `BeginDropdown` / `EndDropdown` | カスタム項目用 |
-| `DropdownItem(label, selected)` | 項目（選択中はフォーカス） |
-| `FieldLabelColumnWidth` | 左ラベル列の既定固定幅（128）。`labelWidth: 0` でラベル側を伸縮 |
-| `labelWidth` / `width` | ラベル／コントロールの固定幅。`<= 0` はその側を伸縮 |
-
-### Input
-
-
-アクセントカラーのテキスト／数値入力。レイアウトは Dropdown と同じ（行幅 100%、`labelWidth` / `width`）。
-
-```csharp
-var name = "Untitled";
-if (MirageUi.InputText("Name", ref name, 128))
-{
-    // changed
-}
-
-var level = 0;
-MirageUi.InputInt("Job level (0=Any)", ref level);
-
-var time = 0f;
-MirageUi.InputFloat(string.Empty, ref time, format: "%.1f", id: "time", width: MirageUi.InputWidthFill);
-```
-
-| API | 説明 |
-| --- | --- |
-| `InputText` | 文字列入力（`hint` でプレースホルダ可） |
-| `InputInt` | 整数入力 |
-| `InputFloat` | 小数入力 |
-| `InputWidthFill` | 右列いっぱい（またはラベルなし時の全幅） |
-
-### その他
-
-| API | 説明 |
-| --- | --- |
-| `PaddedSeparator()` | 上下に余白を持つ区切り線 |
-| `Checkbox(label, ref value)` | チェックボックス |
-| `CheckboxGroup(label, ref value)` | チェック直下をインデント（`using` で解除） |
-| `Radio(label, ref current, value)` | ラジオボタン |
-| `DisabledIf(disabled)` | 子を無効化（`using` で解除） |
-| `SearchFilter(id, ref filter, hint, maxLength)` | 全幅検索入力欄 |
-| `MatchesFilter(key, label, filter)` | エントリの絞り込み判定 |
-| `OverlayFill(screenPos, size, rounding, flags)` | 背景塗りつぶし |
-| `PushFont(FontSize)` | `Default` / `Large` フォントの切り替え |
-
-## MirageUi.TwoColumn
-
-左カラム（サイドバー）と右カラム（メインコンテンツ）の 2 カラムレイアウト。
-
-**レイアウト種別ごとに別実装はしない。** `MirageTwoColumnState` のパラメータで表示要素を切り替える。
-
-### 基本
+The layout consists of a sidebar on the left and main content on the right. `MirageTwoColumnState` controls the layout content and visibility.
 
 ```csharp
 using MirageUI.Layout;
 
 var state = new MirageTwoColumnState
 {
-    ShowSidebar = true,
-    ShowSidebarHeader = true,
     ShowSearch = true,
-    SearchPosition = MirageTwoColumnSearchPosition.Top,
-    ShowEntryToggle = false,
-    SidebarHeader = new MirageTwoColumnSidebarHeader
-    {
-        ImagePath = "path/to/icon.png",
-        ImageWidth = 48f,
-        ImageHeight = 48f,
-        ImageIsCircle = true,
-        Title = "My Plugin",
-        Subtitle = "v1.0.0",
-    },
+    ShowEntryToggle = true,
     Entries =
     [
         new MirageTwoColumnEntry { Id = "settings", Label = "Settings", Enabled = true },
     ],
     SelectedId = "settings",
-    OnSelectionChanged = id => { /* 選択変更 */ },
-    OnEnabledChanged = (id, enabled) => { /* トグル変更 */ },
+    OnSelectionChanged = id => { },
+    OnEnabledChanged = (id, enabled) => { },
 };
 
 MirageUi.TwoColumn.Draw(state, () =>
 {
-    MirageUi.Header("詳細");
+    MirageUi.Header("Details");
 });
 ```
 
-### 表示パラメータ
+| Property | Default | Description |
+| --- | --- | --- |
+| `ShowSidebar` | `true` | Toggles the left column. Setting to `false` expands the right column to full width |
+| `ShowSearch` | `false` | Shows the search bar at the top of the sidebar |
+| `ShowEntryToggle` | `false` | Shows a checkbox on each entry |
+| `SidebarWidth` | `304` | Width of the left column |
+| `SearchHint` | empty | Placeholder text (defaults to MirageUI's "Search" when empty) |
+| `SearchTrailingActions` | empty | Icon buttons placed between the search field and `×` |
+| `SearchFilter` | empty | Filter query string |
+| `AutoSelectFirstOnSearch` | `true` | Automatically selects the first matching item when typing. Clearing the filter keeps the current selection |
+| `OnSearchFilterChanged` | null | Receives the search text each time the search bar is drawn |
 
-| プロパティ | 型 | 既定値 | 説明 |
+The search bar layout is `[search][×]`. When `SearchTrailingActions` is set, it becomes `[search][buttons] | [×]`. Clicking `×` collapses the sidebar. The magnifying glass icon is displayed on the left. Search matches are case-insensitive substrings of either the ID or the label. While filtering, matching folders automatically expand, and entry reordering is disabled.
+
+An entry may set `LabelColor` and `ContextMenuItems`. A right click selects that entry and opens the menu. `SidebarNodes` accepts a folder or a single page entry. `AlwaysExpanded` keeps a folder open. When `EnableEntryReorder` is set, dragging an entry reorders it within its folder, or within the flat list. The new index is passed to `OnEntryReordered`.
+
+Only the entry list scrolls. The search bar stays fixed.
+
+## Widgets
+
+### Text
+
+| Method | Description | Default Color | Default Size |
 | --- | --- | --- | --- |
-| `ShowSidebar` | `bool` | `true` | 左カラム全体の表示/非表示 |
-| `ShowSidebarHeader` | `bool` | `true` | プラグイン情報（アイコン・タイトル・サブタイトル） |
-| `ShowSearch` | `bool` | `false` | 検索バー |
-| `SearchPosition` | `MirageTwoColumnSearchPosition` | `Top` | 検索バーの位置 |
-| `ShowEntryToggle` | `bool` | `false` | 各項目のチェックボックス |
+| `Header` | Large heading | `Color.Title` | `FontSize.Large` |
+| `HeaderWithBool` | Heading with an ON/OFF toggle on the right | `Color.Title` | `FontSize.Large` |
+| `HeaderWithRunToggle` | Heading with a Start/Stop toggle on the right | `Color.Title` | `FontSize.Large` |
+| `SubHeader` | Small heading | `Color.Title` | `FontSize.Default` |
+| `Text` | Regular body text | `Color.Default` | `FontSize.Default` |
 
-`ShowSidebar = false` のときは右カラムのみ全幅表示する。
+`MirageUi.Color` options include `Default`, `Secondary`, `Accent`, `Title`, `Warning`, and `PanelOverlay`.
 
-### 左カラムの構成
+### Button
 
-```text
-[左カラム（固定領域）]
-  ├ プラグイン情報 + PaddedSeparator   … ShowSidebarHeader
-  ├ 検索バー（上部）                     … ShowSearch + Top
-  ├ リスト（スクロール可）
-  └ 検索バー（下部）                     … ShowSearch + Bottom
+`Primary` uses a prominent accent color, while `Secondary` is more muted. Setting `width` to `0` automatically sizes the button to its label; setting it above `0` creates a fixed-width button.
 
-[右カラム]
-  └ drawMainContent で渡した内容
-```
-
-スクロールできるのはリストのみ。プラグイン情報・検索バーは固定。
-
-### 構成例
-
-| 構成 | 設定 |
+| API | Description |
 | --- | --- |
-| リストのみ | `ShowSearch=false`, `ShowEntryToggle=false` |
-| 検索 + リスト | `ShowSearch=true`, `SearchPosition=Top` |
-| 検索 + トグル + リスト | `ShowSearch=true`, `SearchPosition=Bottom`, `ShowEntryToggle=true` |
-| メインのみ | `ShowSidebar=false` |
+| `Button(label, kind, ...)` | Renders a button of type `Primary` or `Secondary` |
+| `PrimaryButton` / `SecondaryButton` | Shorthand methods for `Button` |
 
-### その他のプロパティ
+### Dropdown
 
-| プロパティ | 説明 |
+A dropdown row fills the available content width. The widths for the left label and the right control can be customized independently. The label defaults to a width of 128, and the control fills the remaining space.
+
+| API | Description |
 | --- | --- |
-| `SidebarWidth` | 左カラム幅（デフォルト `304`） |
-| `SidebarPadding` / `MainPadding` | 左カラム・右カラムの余白 |
-| `SearchHint` / `SearchMaxLength` | 検索欄のヒント・最大文字数 |
-| `ItemSpacing` | リスト行間の余白 |
-| `Entries` | 表示項目リスト |
-| `SelectedId` | 選択中の項目 ID |
-| `SearchFilter` | 検索テキスト |
-| `ScrollSelectedIntoView` | `true` で選択項目をスクロール表示内に寄せる |
-| `ShowDebugBorders` | 子ウィンドウのデバッグ用枠線 |
+| `Dropdown(label, ref selected, items, ...)` | Standard string list dropdown |
+| `SearchableDropdown(..., ref searchFilter, ...)` | Dropdown with a search filter |
+| `BeginDropdown` / `EndDropdown` | Custom item rendering block |
+| `DropdownItem(label, selected)` | Single item row (selected item automatically gains focus) |
+| `labelWidth` / `width` | Setting either side to `<= 0` causes it to stretch automatically |
 
-## MirageTheme
+Duplicate labels cannot be distinguished as unique selections. Disambiguate them using the `label##id` syntax.
+
+### Input
+
+Shares the same layout structure as Dropdown.
+
+| API | Description |
+| --- | --- |
+| `InputText` | Text input (`hint` sets the placeholder text) |
+| `InputInt` / `InputFloat` | Numeric input |
+| `DragInt` / `DragFloat` | Draggable numeric field |
+| `SliderInt` / `SliderFloat` | Slider control |
+| `InputWidthFill` | Expands the control to fill the right column |
+
+### Images and Icons
+
+| API | Description |
+| --- | --- |
+| `Image(path, width, height, ...)` | Loads a local image file. Returns `false` if loading fails |
+| `GameIcon(iconId, width, height, ...)` | Renders an in-game icon |
+| `TryGetGameIcon` | Retrieves the icon texture directly |
+| `IconButton` | Icon button (border disabled by default) |
+| `IconToggleButton` | Toggleable two-state button (border enabled by default) |
+| `IconChecklistButton` | Opens a checklist menu |
+| `IconToolbar` | Single-row toolbar combining filter, sort, and search |
+| `IconLabelToggleGrid` | Grid of icon and label toggle tiles |
+| `MultiSelectHighlightList` | Multi-selection list |
+
+### Other
+
+| API | Description |
+| --- | --- |
+| `PaddedSeparator` | Horizontal separator with padding above and below |
+| `Checkbox` / `Radio` | Standard checkbox and radio controls |
+| `CheckboxGroup` | Indents the child block (end scope by disposing the `using` block) |
+| `DisabledIf` | Conditionally disables child widgets (end scope by disposing the `using` block) |
+| `SearchFilter` | Search input field with a leading magnifying glass |
+| `MatchesFilter` | Substring match check on ID and label |
+| `Link` | Link button |
+| `ColorEdit4` | Color picker |
+| `ListRow` | Title and detail item row |
+| `CollapsibleSubHeader` | Collapsible small heading |
+| `Message.Draw` | Confirmation dialog (drawn at the end of the host window) |
+| `ContextMenu` | Right-click context menu |
+| `PushFont` | Switches font to `Default` or `Large` |
+
+A `Message` dialog can contain up to three buttons. Each button supports `Primary`, `OnClick`, and `CloseOnClick`.
+
+## Theme
+
+Pass a callback function returning a `MirageColorSettings` instance to `ConfigureTheme`. `CreateDefault` instantiates and returns a standard light-theme configuration. `CreateWhite` and `CreateBlack` presets are also available. `WindowBg` includes alpha, and the title bar uses the same color. `ChromeBg` is the extra coat on the title bar, sidebar, and menu. `PageBg` is the extra coat on the page. Inputs, dropdowns, and bordered icon buttons use the accent color, as do buttons and messages. `Separator` is the line under the title bar, the line between the sidebar and the page, the dividers inside the sidebar, the dividers between button groups, the two-column menu outline, the frame of the window menu and shortcut popups, and the section line in menus, headings, and shortcut popups. The search field outline uses the same color at alpha 0.28. `BlurStrength` defaults to 8. A value of 0 disables the blur.
+
+Color configurations can be exported to and imported from JSON.
 
 ```csharp
-// デフォルトプリセットに戻す
-MirageTheme.ResetToDefault(settings);
-
-// Dalamud 標準配色に戻す
-MirageTheme.ResetToDalamudDefaults(settings);
-
-// JSON 入出力
 var json = MirageColorSettingsJson.Export(settings);
 MirageColorSettingsJson.TryImport(json, out var imported);
 ```
 
-`MirageColorSettings` では ImGui の背景色・ヘッダー色・フォントサイズ等を持つ。`SetColor` / `GetColor` で `MirageUi.Color` 毎の文字色も編集できる。
+`SetColor` and `GetColor` allow reading and overriding text colors for each `MirageUi.Color`.
 
-## MirageLayout
-
-ImGui のカーソル・スタイルへのショートカット。
+## Layout
 
 ```csharp
 using static MirageUI.Ui.MirageLayout;
@@ -351,13 +298,13 @@ var avail = Style.ContentRegionAvail;
 Cursor.Y += 8f;
 ```
 
-| メンバー | 説明 |
+| Member | Description |
 | --- | --- |
-| `Style.Scale` | Dalamud のグローバルスケール |
-| `Style.ContentRegionAvail` | 利用可能領域サイズ |
-| `Cursor.Position` | ウィンドウ内カーソル位置 |
-| `Cursor.ScreenPosition` | スクリーン座標 |
+| `Style.Scale` | Global Dalamud UI scale factor |
+| `Style.ContentRegionAvail` | Remaining available content area |
+| `Cursor.Position` | Cursor position relative to the current window |
+| `Cursor.ScreenPosition` | Absolute screen position of the cursor |
 
-## ライセンス
+## License
 
 AGPL-3.0-or-later

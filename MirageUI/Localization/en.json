@@ -1,0 +1,16 @@
+{
+  "window.theme": "Theme",
+  "window.language": "Language",
+  "window.collapse": "Collapse",
+  "window.expand": "Expand",
+  "window.close": "Close",
+  "window.pin": "Pin Window",
+  "window.pin.info": "Fixes the window position.",
+  "window.clickthrough": "Make clickthrough",
+  "window.clickthrough.info": "Disables clicks on this window.",
+  "window.screenshot": "Copy Screenshot to Clipboard",
+  "window.preview": "Preview",
+  "window.search": "Search",
+  "window.plugin": "Plugin page",
+  "window.unset": "(not set)"
+}

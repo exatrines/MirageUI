@@ -4,7 +4,7 @@
 
     <PropertyGroup>
         <Authors>mirage</Authors>
-        <Version>1.0.0</Version>
+        <Version>2.0.0</Version>
         <Description>Mirage UI library for Dalamud plugins</Description>
         <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     </PropertyGroup>
@@ -32,6 +32,11 @@
         <DalamudLibPath Condition="'$(DALAMUD_HOME)' != ''">$(DALAMUD_HOME)/</DalamudLibPath>
         <DalamudLibPath Condition="'$(DALAMUD_HOME)' == ''">$(Dalamud_Home)</DalamudLibPath>
     </PropertyGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Localization\en.json" LogicalName="MirageUI.Localization.en.json" />
+        <EmbeddedResource Include="Localization\ja.json" LogicalName="MirageUI.Localization.ja.json" />
+    </ItemGroup>
 
     <ItemGroup>
         <Reference Include="Dalamud">

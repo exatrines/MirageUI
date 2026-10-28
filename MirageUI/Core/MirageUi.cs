@@ -10,7 +10,6 @@ public static partial class MirageUi
 {
     private static MirageInputStyle _inputStyle = new();
 
-    /// <summary>Current shared input / dropdown metrics.</summary>
     public static MirageInputStyle InputStyle => _inputStyle;
 
     internal static Func<MirageColorSettings> ResolveAppliedColors { get; private set; } =
@@ -19,20 +18,15 @@ public static partial class MirageUi
     public static void ConfigureTheme(Func<MirageColorSettings> resolveAppliedColors) =>
         ResolveAppliedColors = resolveAppliedColors;
 
-    /// <summary>Replace the shared input style settings.</summary>
     public static void SetInputStyle(MirageInputStyle style) =>
         _inputStyle = style ?? new MirageInputStyle();
 
-    /// <summary>Mutate the shared input style settings.</summary>
     public static void ConfigureInputStyle(Action<MirageInputStyle> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
         configure(_inputStyle);
     }
 
-    /// <summary>
-    /// Frame padding applied to Mirage inputs and dropdowns (text vertically centered via pad Y).
-    /// </summary>
     public static Vector2 ResolveInputFramePadding()
     {
         var current = MirageLayout.Style.FramePadding;
@@ -49,10 +43,6 @@ public static partial class MirageUi
         return new Vector2(padX, padYDefault);
     }
 
-    /// <summary>
-    /// Outer control height shared by inputs, dropdowns, and buttons
-    /// (<see cref="MirageInputStyle.Height"/>, or text line + resolved frame padding).
-    /// </summary>
     public static float ResolveControlHeight()
     {
         if (_inputStyle.Height is { } height)
@@ -68,6 +58,7 @@ public static partial class MirageUi
         IPluginLog? log = null)
     {
         UiContext.Set(pluginInterface, log);
+        I18n.RegisterEmbedded(typeof(MirageUi).Assembly, "MirageUI.Localization");
         FontRegistry.Init();
         if (textureProvider != null)
             ImageRegistry.Init(textureProvider);
@@ -76,6 +67,7 @@ public static partial class MirageUi
 
     public static void Dispose()
     {
+        I18n.Reset();
         DisposePluginPage();
         ImageRegistry.Dispose();
         FontRegistry.Dispose();

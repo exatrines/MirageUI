@@ -6,7 +6,6 @@ namespace MirageUI.Ui;
 internal static class MirageIconButton
 {
     internal static readonly Vector4 DefaultBackground = new(1f, 1f, 1f, 0f);
-    internal static readonly Vector4 DefaultText = new(1f, 1f, 1f, 1f);
     internal static readonly Vector4 DefaultHoveredBackground = new(1f, 1f, 1f, 0.08f);
     internal static readonly Vector4 DefaultActiveBackground = new(1f, 1f, 1f, 0.16f);
 
@@ -14,8 +13,6 @@ internal static class MirageIconButton
     internal static readonly Vector4 RunRed = new(0.9f, 0.35f, 0.35f, 1f);
 
     private const float FrameRounding = 3f;
-    private const float PaddingTop = -1f;
-    private const float PaddingBottom = 1f;
 
     internal static bool Draw(
         FontAwesomeIcon icon,
@@ -84,23 +81,13 @@ internal static class MirageIconButton
         var displayIcon = enabled && hovered && hoverIcon is { } hover ? hover : icon;
         var label = displayIcon.ToIconString();
 
-        ImGui.PushFont(UiBuilder.IconFont);
-        var iconSize = ImGui.CalcTextSize(label);
-        ImGui.PopFont();
-
-        var padX = MirageLayout.Style.FramePadding.X;
-        var availMin = new Vector2(bb.Min.X + padX, bb.Min.Y + PaddingTop);
-        var availMax = new Vector2(bb.Max.X - padX, bb.Max.Y - PaddingBottom);
-        var iconPos = new Vector2(
-            availMin.X + (availMax.X - availMin.X - iconSize.X) * 0.5f,
-            availMin.Y + (availMax.Y - availMin.Y - iconSize.Y) * 0.5f);
-
         var settingsForText = MirageTheme.Active ?? MirageTheme.ResolveAppliedColors();
         var drawColor = enabled ? textColor : WithAlpha(textColor, 0.6f);
         if (enabled && hovered)
             drawColor = hoverTextColor ?? settingsForText.GetColor(MirageUi.Color.Accent);
 
         ImGui.PushFont(UiBuilder.IconFont);
+        var iconPos = IconOrigin(bb.Min, size, label);
         ImGui.GetWindowDrawList().AddText(iconPos, MirageUi.ToUInt(drawColor), label);
         ImGui.PopFont();
 
@@ -108,6 +95,22 @@ internal static class MirageIconButton
             MirageTooltip.Show(tooltip, tooltipPosition, bb);
 
         return pressed;
+    }
+
+    // Center the painted glyph, not the font advance box. Advance centering leaves the ink left of the frame.
+    private static unsafe Vector2 IconOrigin(Vector2 boxMin, Vector2 boxSize, string label)
+    {
+        var font = ImGui.GetFont();
+        var glyph = label.Length > 0 ? font.FindGlyph(label[0]) : null;
+        if (glyph == null)
+            return boxMin + (boxSize - ImGui.CalcTextSize(label)) * 0.5f;
+
+        var scale = ImGui.GetFontSize() / font.FontSize;
+        var inkCenter = new Vector2(glyph->X0 + glyph->X1, glyph->Y0 + glyph->Y1) * (0.5f * scale);
+        var origin = boxMin + boxSize * 0.5f - inkCenter;
+        return new Vector2(
+            MathF.Round(origin.X, MidpointRounding.AwayFromZero),
+            MathF.Round(origin.Y, MidpointRounding.AwayFromZero));
     }
 
     private static Vector4 ResolveHoveredBackground(Vector4 backgroundColor) =>

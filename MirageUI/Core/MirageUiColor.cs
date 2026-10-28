@@ -12,19 +12,14 @@ public static partial class MirageUi
         Title,
         Warning,
         Info,
-        PanelOverlay,
     }
 
     public static Vector4 GetColor(Color color) =>
         (MirageTheme.Active ?? ResolveAppliedColors()).GetColor(color);
 
-    public static uint PanelOverlay => ToUInt(GetColor(Color.PanelOverlay));
-
-    /// <summary>Copy RGB from <paramref name="color"/> and replace alpha.</summary>
     public static Vector4 WithAlpha(Vector4 color, float alpha) =>
         new(color.X, color.Y, color.Z, alpha);
 
-    /// <summary>Linear blend of two colors by <paramref name="t"/> (0–1).</summary>
     public static Vector4 MixColors(Vector4 a, Vector4 b, float t) =>
         new(
             a.X + (b.X - a.X) * t,

@@ -1,0 +1,16 @@
+{
+  "window.theme": "テーマ",
+  "window.language": "言語",
+  "window.collapse": "折りたたむ",
+  "window.expand": "展開",
+  "window.close": "閉じる",
+  "window.pin": "ウィンドウをピン留め",
+  "window.pin.info": "ウィンドウの位置を固定します。",
+  "window.clickthrough": "クリックを透過",
+  "window.clickthrough.info": "ウィンドウのクリックを無効化します。",
+  "window.screenshot": "スクリーンショットをクリップボードにコピー",
+  "window.preview": "プレビュー",
+  "window.search": "検索",
+  "window.plugin": "プラグインページ",
+  "window.unset": "（未設定）"
+}

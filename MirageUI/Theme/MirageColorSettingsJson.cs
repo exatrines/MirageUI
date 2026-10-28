@@ -55,6 +55,8 @@ public static class MirageColorSettingsJson
         public bool? UseCustomColors { get; set; }
 
         public float[]? WindowBg { get; set; }
+        public float[]? ChromeBg { get; set; }
+        public float[]? PageBg { get; set; }
         public float[]? ChildBg { get; set; }
 
         public float[]? Header { get; set; }
@@ -74,24 +76,26 @@ public static class MirageColorSettingsJson
         public float[]? Title { get; set; }
         public float[]? Warning { get; set; }
         public float[]? Info { get; set; }
-        public float[]? PanelOverlay { get; set; }
 
         public float[]? Text { get; set; }
         public float[]? TextDisabled { get; set; }
         public float[]? AccentTitle { get; set; }
         public float[]? AccentEnabled { get; set; }
-        public float[]? SidebarOverlay { get; set; }
 
         public float? TitleFontSizePt { get; set; }
         public float? ToolTitleFontSizePt { get; set; }
 
         public float? UiFontSizePt { get; set; }
 
+        public float? BlurStrength { get; set; }
+
         public static MirageColorSettingsDto From(MirageColorSettings settings) =>
             new()
             {
                 UseCustomColors = settings.UseCustomColors,
                 WindowBg = ToArray(settings.WindowBg),
+                ChromeBg = ToArray(settings.ChromeBg),
+                PageBg = ToArray(settings.PageBg),
                 ChildBg = ToArray(settings.ChildBg),
                 Header = ToArray(settings.Header),
                 HeaderHovered = ToArray(settings.HeaderHovered),
@@ -107,9 +111,9 @@ public static class MirageColorSettingsJson
                 Title = ToArray(settings.GetColor(MirageUi.Color.Title)),
                 Warning = ToArray(settings.GetColor(MirageUi.Color.Warning)),
                 Info = ToArray(settings.GetColor(MirageUi.Color.Info)),
-                PanelOverlay = ToArray(settings.GetColor(MirageUi.Color.PanelOverlay)),
                 TitleFontSizePt = settings.TitleFontSizePt,
                 UiFontSizePt = settings.UiFontSizePt,
+                BlurStrength = settings.BlurStrength,
             };
 
         public MirageColorSettings ToSettings()
@@ -129,7 +133,17 @@ public static class MirageColorSettingsJson
                 CheckMark = ToVector4(CheckMark),
                 TitleFontSizePt = TitleFontSizePt ?? ToolTitleFontSizePt ?? MirageColorSettings.DefaultLargeFontSizePt,
                 UiFontSizePt = UiFontSizePt ?? MirageColorSettings.DefaultFontSizePt,
+                BlurStrength = Math.Clamp(
+                    BlurStrength ?? MirageColorSettings.DefaultBlurStrength,
+                    0f,
+                    MirageColorSettings.MaxBlurStrength),
             };
+
+            settings.ChromeBg = HasColor(ChromeBg) ? ToVector4(ChromeBg) : settings.WindowBg;
+            var page = HasColor(PageBg) ? ToVector4(PageBg) : settings.WindowBg;
+            if (!HasColor(PageBg))
+                page.W = 0.70f;
+            settings.PageBg = page;
 
             settings.SetColor(MirageUi.Color.Default, ToVector4(Default ?? Text));
             settings.SetColor(MirageUi.Color.Secondary, ToVector4(Secondary ?? TextDisabled));
@@ -137,10 +151,11 @@ public static class MirageColorSettingsJson
             settings.SetColor(MirageUi.Color.Title, ToVector4(Title ?? AccentTitle));
             settings.SetColor(MirageUi.Color.Warning, ToVector4(Warning));
             settings.SetColor(MirageUi.Color.Info, ToVector4(Info));
-            settings.SetColor(MirageUi.Color.PanelOverlay, ToVector4(PanelOverlay ?? SidebarOverlay));
 
             return settings;
         }
+
+        private static bool HasColor(float[]? values) => values is { Length: >= 3 };
 
         private static float[] ToArray(Vector4 color) => [color.X, color.Y, color.Z, color.W];
 
