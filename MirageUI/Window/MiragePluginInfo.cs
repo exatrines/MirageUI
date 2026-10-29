@@ -24,6 +24,8 @@ public sealed class MiragePluginInfo
 
     public FontAwesomeIcon TitleBarIcon { get; set; } = FontAwesomeIcon.Heart;
 
+    public float IconCornerFraction { get; set; } = 88f / 512f;
+
     public static MiragePluginInfo FromPluginInterface(IDalamudPluginInterface pluginInterface)
     {
         ArgumentNullException.ThrowIfNull(pluginInterface);

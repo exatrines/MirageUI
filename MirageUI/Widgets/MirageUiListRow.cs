@@ -7,7 +7,7 @@ public static partial class MirageUi
     public static bool ListRow(string title, string detail, ref bool value, string id = "")
     {
         var rowId = string.IsNullOrEmpty(id) ? title : id;
-        var trailing = ImGui.GetFrameHeight();
+        var trailing = ResolveControlHeight();
         var clicked = DrawListRow(rowId, title, detail, trailing, out var origin, out var rowWidth, out var rowHeight);
         if (clicked)
             value = !value;
@@ -17,7 +17,7 @@ public static partial class MirageUi
         ImGui.SetCursorScreenPos(new Vector2(
             origin.X + rowWidth - padX - trailing,
             origin.Y + (rowHeight - trailing) * 0.5f));
-        var changed = ImGui.Checkbox($"##{rowId}", ref value);
+        var changed = Checkbox($"##{rowId}", ref value);
         ImGui.SetCursorScreenPos(after);
         return clicked || changed;
     }

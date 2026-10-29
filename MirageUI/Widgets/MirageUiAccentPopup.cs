@@ -11,6 +11,7 @@ public static partial class MirageUi
         var accent = settings.GetColor(Color.Accent);
         var scale = MirageLayout.Style.Scale;
         var popupBg = MixColors(settings.WindowBg, accent, 0.08f);
+        popupBg.W = 0.96f;
 
         ImGui.PushStyleColor(ImGuiCol.PopupBg, popupBg);
         ImGui.PushStyleColor(ImGuiCol.FrameBg, WithAlpha(accent, 0.14f));

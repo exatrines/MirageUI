@@ -65,7 +65,7 @@ public override void PostDraw()
 
 ## Window
 
-`MirageWindowHeader` renders the title bar and the left rail. The menu, collapse, close, and rail expand buttons remain fixed. Any other button can be added as a `MirageWindowFeature`.
+`MirageWindowHeader` renders the title bar and the left rail. `Draw` blurs the window background once, using `BlurStrength`. The title bar and rail use `ChromeBg`. The page uses `PageBg`. Another blur in the same window during the same frame is skipped. The menu, collapse, close, and rail expand buttons remain fixed. Any other button can be added as a `MirageWindowFeature`.
 
 Page entries are provided as a `Section` list in the order specified. This list is separate from the feature buttons.
 
@@ -118,7 +118,7 @@ Dalamud's IconFont only supports Font Awesome Free Solid. Brand icons are not su
 
 The default page centers the name, version, `by author`, message, and links. When `Data/plugin-icon.png` is present, the icon is centered above them. When it is missing, that space is omitted. By passing a custom draw callback to `SetPluginPage`, `DrawPluginPage` will render the entire page using that callback. Pass `null` to restore the default layout.
 
-Without the image, the left rail mark uses `TitleBarIcon`. The default is `FontAwesomeIcon.Heart`. Set another icon through `ConfigurePluginInfo`.
+Without the image, the left rail mark uses `TitleBarIcon`. The default is `FontAwesomeIcon.Heart`. Set another icon through `ConfigurePluginInfo`. `IconCornerFraction` is the corner radius as a fraction of the icon side. The default is `88/512`. `0` keeps the rail shadow and hover plate square.
 
 The two-column overlay opened by `TogglePluginPage` or `OpenPluginPage` does not use `SetPluginPage`. It draws the default page.
 
@@ -134,6 +134,10 @@ MirageUi.SetPluginPage(() =>
     MirageUi.Header("Plugin");
 });
 ```
+
+### Table
+
+`Table.Draw` keeps the header and the optional add row fixed. The rows between them scroll vertically. When the columns are wider than the view, one horizontal scrollbar moves the header, rows, and add row together. The table is a rounded panel, using the same corner radius as text inputs. Columns are not boxed. A column with `Stretch` uses `Width` as its minimum and takes leftover space. `Align` is `Left` or `Center`. It applies to the header and to button text. On a narrow column, about two controls wide or less, `Center` also places a control the height of a text input, such as a checkbox, in the middle of the cell. The default is left. `CenterItem` puts a shorter control on the same vertical center as a text input. `NextColumn` moves to the next cell. Return `true` from the row callback to stop the list, for example after deleting that row.
 
 ## Language
 
@@ -223,6 +227,7 @@ A dropdown row fills the available content width. The widths for the left label 
 | API | Description |
 | --- | --- |
 | `Dropdown(label, ref selected, items, ...)` | Standard string list dropdown |
+| `MultiSelectDropdown(label, preview, items, selected, ...)` | Several rows stay selected. A selected row uses the header background, and the popup stays open |
 | `SearchableDropdown(..., ref searchFilter, ...)` | Dropdown with a search filter |
 | `BeginDropdown` / `EndDropdown` | Custom item rendering block |
 | `DropdownItem(label, selected)` | Single item row (selected item automatically gains focus) |
@@ -247,7 +252,8 @@ Shares the same layout structure as Dropdown.
 | API | Description |
 | --- | --- |
 | `Image(path, width, height, ...)` | Loads a local image file. Returns `false` if loading fails |
-| `GameIcon(iconId, width, height, ...)` | Renders an in-game icon |
+| `GameIcon(iconId, width, height, ...)` | Renders an in-game icon. `framed: true` draws it in the same frame as a text input |
+| `ImageFrame(texture, min, max)` | Draws an image in that frame. A null texture draws the empty frame |
 | `TryGetGameIcon` | Retrieves the icon texture directly |
 | `IconButton` | Icon button (border disabled by default) |
 | `IconToggleButton` | Toggleable two-state button (border enabled by default) |
@@ -261,7 +267,7 @@ Shares the same layout structure as Dropdown.
 | API | Description |
 | --- | --- |
 | `PaddedSeparator` | Horizontal separator with padding above and below |
-| `Checkbox` / `Radio` | Standard checkbox and radio controls |
+| `Checkbox` / `Radio` | Checkbox and radio controls, the same height and corner radius as text inputs |
 | `CheckboxGroup` | Indents the child block (end scope by disposing the `using` block) |
 | `DisabledIf` | Conditionally disables child widgets (end scope by disposing the `using` block) |
 | `SearchFilter` | Search input field with a leading magnifying glass |

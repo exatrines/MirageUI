@@ -20,6 +20,8 @@ public static class MirageWindowHeader
     private const float PreviewLimitUnscaled = 320f;
 
     private static bool _leftWasDown;
+    private static uint _backdropWindow;
+    private static int _backdropFrame = -1;
 
     public const string PluginPageId = "plugin";
 
@@ -70,6 +72,7 @@ public static class MirageWindowHeader
         ref string pageId,
         IReadOnlyList<MirageWindowFeature>? features = null)
     {
+        DrawBackdrop();
         var scale = ImGuiHelpers.GlobalScale;
         var height = BarHeight;
         var width = ImGui.GetWindowSize().X;
@@ -193,7 +196,35 @@ public static class MirageWindowHeader
         ImGui.SetCursorPos(new Vector2(leftInset, height));
     }
 
-    public static void FillContentPage()
+    public static void DrawBackdrop()
+    {
+        if (ImGui.GetWindowViewport().ID != ImGui.GetMainViewport().ID)
+            return;
+
+        var window = ImGuiP.GetCurrentWindow();
+        var frame = ImGui.GetFrameCount();
+        if (window.ID == _backdropWindow && frame == _backdropFrame)
+            return;
+
+        _backdropWindow = window.ID;
+        _backdropFrame = frame;
+
+        var strength = (MirageTheme.Active ?? MirageTheme.ResolveAppliedColors()).BlurStrength;
+        if (strength <= 0f)
+            return;
+
+        var min = ImGui.GetWindowPos();
+        var max = min + ImGui.GetWindowSize();
+        ImGuiHelpers.PrependBlurBehind(
+            ImGui.GetWindowDrawList(),
+            min,
+            max,
+            blurStrength: strength,
+            rounding: ImGui.GetStyle().WindowRounding,
+            noiseOpacity: 0f);
+    }
+
+    public static void FillContentPage(ImDrawFlags corners = ImDrawFlags.RoundCornersBottomRight)
     {
         var min = ImGui.GetCursorScreenPos();
         var max = min + ImGui.GetContentRegionAvail();
@@ -203,7 +234,7 @@ public static class MirageWindowHeader
             max,
             ImGui.GetColorU32(coat),
             ImGui.GetStyle().WindowRounding,
-            ImDrawFlags.RoundCornersBottomRight);
+            corners);
     }
 
     public static void DrawRailDivider(float railWidth)
@@ -218,10 +249,11 @@ public static class MirageWindowHeader
 
     private static void FillChrome(Vector2 min, Vector2 max, ImDrawFlags corners)
     {
+        var coat = (MirageTheme.Active ?? MirageTheme.ResolveAppliedColors()).ChromeBg;
         ImGui.GetWindowDrawList().AddRectFilled(
             min,
             max,
-            ImGui.GetColorU32((MirageTheme.Active ?? MirageTheme.ResolveAppliedColors()).ChromeBg),
+            ImGui.GetColorU32(coat),
             ImGui.GetStyle().WindowRounding,
             corners);
     }
@@ -433,31 +465,37 @@ public static class MirageWindowHeader
         bool selected,
         ref string selectedId)
     {
-        var icon = collapsed ? RailButtonSize(scale) : 48f * scale;
-        var pos = origin + new Vector2((rail - icon) * 0.5f, top);
+        var icon = MathF.Round(collapsed ? RailButtonSize(scale) : 48f * scale);
+        var raw = origin + new Vector2((rail - icon) * 0.5f, top);
+        var pos = new Vector2(MathF.Round(raw.X), MathF.Round(raw.Y));
         var size = new Vector2(icon, icon);
         var bb = new ImRect(pos, pos + size);
         var drawList = ImGui.GetWindowDrawList();
         var hovered = bb.Contains(ImGui.GetMousePos());
-        DrawIconShadow(drawList, pos, size, scale, hovered);
+        var radius = IconCornerRadius(size);
+        DrawIconShadow(drawList, pos, size, radius, scale, hovered);
         if (hovered)
         {
             var pad = 1f * scale;
             drawList.AddRectFilled(
                 pos - new Vector2(pad, pad),
                 pos + size + new Vector2(pad, pad),
-                ImGui.GetColorU32(ImGuiCol.HeaderHovered));
+                ImGui.GetColorU32(ImGuiCol.HeaderHovered),
+                radius <= 0f ? 0f : radius + pad);
         }
 
         var path = MirageUi.PluginInfo.IconPath;
-        ImGui.SetCursorScreenPos(pos);
-        if (string.IsNullOrWhiteSpace(path) || !MirageUi.Image(path, icon, icon))
+        if (string.IsNullOrWhiteSpace(path) || !ImageRegistry.TryGetWrap(path, out var texture))
         {
             var glyph = MirageUi.PluginInfo.TitleBarIcon.ToIconString();
             ImGui.PushFont(UiBuilder.IconFont);
             var glyphSize = ImGui.CalcTextSize(glyph);
             drawList.AddText(pos + (size - glyphSize) * 0.5f, ImGui.GetColorU32(ImGuiCol.Text), glyph);
             ImGui.PopFont();
+        }
+        else
+        {
+            drawList.AddImage(texture.Handle, pos, pos + size);
         }
 
         ImGui.SetCursorScreenPos(pos);
@@ -467,7 +505,19 @@ public static class MirageWindowHeader
         return icon;
     }
 
-    private static void DrawIconShadow(ImDrawListPtr drawList, Vector2 pos, Vector2 size, float scale, bool hovered)
+    private static float IconCornerRadius(Vector2 size)
+    {
+        var fraction = MathF.Max(0f, MirageUi.PluginInfo.IconCornerFraction);
+        return MathF.Min(size.X, size.Y) * fraction;
+    }
+
+    private static void DrawIconShadow(
+        ImDrawListPtr drawList,
+        Vector2 pos,
+        Vector2 size,
+        float radius,
+        float scale,
+        bool hovered)
     {
         var spread = (hovered ? 7f : 5f) * scale;
         var drop = new Vector2(0f, (hovered ? 2f : 1.5f) * scale);
@@ -483,7 +533,12 @@ public static class MirageWindowHeader
             var grow = spread * t;
             var min = pos + drop - new Vector2(grow, grow);
             var max = pos + size + drop + new Vector2(grow, grow);
-            drawList.AddRectFilled(min, max, ImGui.GetColorU32(new Vector4(0f, 0f, 0f, alpha)));
+            var rounding = radius <= 0f ? 0f : radius + grow;
+            drawList.AddRectFilled(
+                min,
+                max,
+                ImGui.GetColorU32(new Vector4(0f, 0f, 0f, alpha)),
+                rounding);
         }
     }
 

@@ -65,7 +65,7 @@ public override void PostDraw()
 
 ## ウィンドウ
 
-`MirageWindowHeader` はタイトルバーと左側のレールを描画します。メニュー、折りたたみ、閉じる、およびレールの展開ボタンの位置は固定されています。その他のボタンはすべて `MirageWindowFeature` として渡します。
+`MirageWindowHeader` はタイトルバーと左側のレールを描画します。`Draw` は `BlurStrength` でウィンドウ背景を一度ぼかします。タイトルバーとレールは `ChromeBg`、ページは `PageBg` です。同じフレームの同じウィンドウでは、重ねてぼかしません。メニュー、折りたたみ、閉じる、およびレールの展開ボタンの位置は固定されています。その他のボタンはすべて `MirageWindowFeature` として渡します。
 
 ページ項目は、指定された順序通りの `Section` リストになります。このリストは機能ボタンとは別になっています。
 
@@ -118,7 +118,7 @@ Dalamud の IconFont は Font Awesome Free Solid のみ対応しています。�
 
 デフォルトのページでは、名前、バージョン、`by author`（作者名）、メッセージ、リンクが中央揃えで配置されます。`Data/plugin-icon.png` があるときだけ、その上にアイコンを出します。無いときは、その分の空白も出しません。`SetPluginPage` に描画コールバックを渡すと、`DrawPluginPage` がそのコールバックを使用してページ全体を描画します。`null` を渡すとデフォルトに戻ります。
 
-画像が無いとき、左レールのマークは `TitleBarIcon` です。既定は `FontAwesomeIcon.Heart` です。別のアイコンは `ConfigurePluginInfo` で指定します。
+画像が無いとき、左レールのマークは `TitleBarIcon` です。既定は `FontAwesomeIcon.Heart` です。別のアイコンは `ConfigurePluginInfo` で指定します。`IconCornerFraction` はアイコンの一辺に対する角の半径です。既定は `88/512` です。`0` にするとレールのシャドウとホバー下地は四角のままです。
 
 2列レイアウトのオーバーレイは `TogglePluginPage` または `OpenPluginPage` で開きます。このオーバーレイは `SetPluginPage` を使わず、デフォルトのページを描画します。
 
@@ -134,6 +134,10 @@ MirageUi.SetPluginPage(() =>
     MirageUi.Header("Plugin");
 });
 ```
+
+### 表
+
+`Table.Draw` はヘッダーと、任意の追加行を固定します。その間の行は縦にスクロールします。列幅が画面より広いときは、横スクロールバーひとつでヘッダー、行、追加行が一緒に動きます。表は入力欄と同じ角丸のパネルで、列を格子にはしません。`Stretch` の列は `Width` を最小幅にし、余った幅を受け取ります。`Align` は `Left` または `Center` で、ヘッダーとセル内のボタン文言に使います。コントロール二つ分くらいまでの狭い列では、`Center` はチェックボックスのように入力と同じ高さのコントロールもセル中央に置きます。既定は左寄せです。`CenterItem` は、入力より低いコントロールを入力と同じ縦の中心に置きます。`NextColumn` で次のセルへ進みます。行コールバックが `true` を返すと、その行で一覧を止めます。削除した行のあとを描かないときに使います。
 
 ## 言語
 
@@ -223,6 +227,7 @@ MirageUi.TwoColumn.Draw(state, () =>
 | API | 説明 |
 | --- | --- |
 | `Dropdown(label, ref selected, items, ...)` | 文字列リスト |
+| `MultiSelectDropdown(label, preview, items, selected, ...)` | 複数行を選んだままにします。選択中はヘッダー背景になり、ポップアップは閉じません |
 | `SearchableDropdown(..., ref searchFilter, ...)` | 検索機能付き |
 | `BeginDropdown` / `EndDropdown` | 項目を自前で描画 |
 | `DropdownItem(label, selected)` | 1行分。選択中の行にフォーカスが当たります |
@@ -247,7 +252,8 @@ MirageUi.TwoColumn.Draw(state, () =>
 | API | 説明 |
 | --- | --- |
 | `Image(path, width, height, ...)` | ローカルファイル。読み込まれていない場合は `false` を返します |
-| `GameIcon(iconId, width, height, ...)` | ゲーム内アイコン |
+| `GameIcon(iconId, width, height, ...)` | ゲーム内アイコン。`framed: true` で入力欄と同じ枠に描きます |
+| `ImageFrame(texture, min, max)` | その枠の中に画像を描きます。テクスチャが null のときは空の枠です |
 | `TryGetGameIcon` | テクスチャのみを取得 |
 | `IconButton` | アイコンボタン。デフォルトでは枠線なし |
 | `IconToggleButton` | 2つの状態を持つボタン。デフォルトでは枠線あり |
@@ -261,7 +267,7 @@ MirageUi.TwoColumn.Draw(state, () =>
 | API | Description |
 | --- | --- |
 | `PaddedSeparator` | 上下に余白のある区切り線 |
-| `Checkbox` / `Radio` | チェックボックスとラジオボタン |
+| `Checkbox` / `Radio` | チェックボックスとラジオボタン。入力欄と同じ高さと角丸 |
 | `CheckboxGroup` | 下のブロックをインデントします。終了時は `using` を破棄します |
 | `DisabledIf` | 子要素を無効化します。終了時は `using` を破棄します |
 | `SearchFilter` | 左側に虫眼鏡アイコンが付いた入力フィールド |

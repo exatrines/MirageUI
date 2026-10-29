@@ -5,25 +5,8 @@ using MirageUI.Theme;
 
 internal static class TwoColumnLayout
 {
-    internal static void DrawWindowBlur()
-    {
-        if (ImGui.GetWindowViewport().ID != ImGui.GetMainViewport().ID)
-            return;
-
-        var strength = (MirageTheme.Active ?? MirageTheme.ResolveAppliedColors()).BlurStrength;
-        if (strength <= 0f)
-            return;
-
-        var min = ImGui.GetWindowPos();
-        var max = min + ImGui.GetWindowSize();
-        ImGuiHelpers.PrependBlurBehind(
-            ImGui.GetWindowDrawList(),
-            min,
-            max,
-            blurStrength: strength,
-            rounding: ImGui.GetStyle().WindowRounding,
-            noiseOpacity: 0f);
-    }
+    internal static void DrawWindowBlur() =>
+        MirageWindowHeader.DrawBackdrop();
 
     internal static void Draw(
         MirageTwoColumnState state,
@@ -686,7 +669,7 @@ internal static class TwoColumnLayout
                 case MirageTwoColumnEntryKind.Bool:
                 {
                     var enabled = entry.Enabled;
-                    if (ImGui.Checkbox("##TwoColumnToggle"u8, ref enabled))
+                    if (MirageUi.Checkbox("##TwoColumnToggle", ref enabled))
                     {
                         entry.Enabled = enabled;
                         state.OnEnabledChanged?.Invoke(entry.Id, enabled);

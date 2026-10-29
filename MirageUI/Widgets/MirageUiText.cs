@@ -134,17 +134,32 @@ public static partial class MirageUi
         }
     }
 
-    public static bool Checkbox(string label, ref bool value) =>
-        ImGui.Checkbox(label, ref value);
+    public static bool Checkbox(string label, ref bool value)
+    {
+        using (PushCheckStyle())
+            return ImGui.Checkbox(label, ref value);
+    }
 
-    public static bool Radio(string label, ref int current, int value) =>
-        ImGui.RadioButton(label, ref current, value);
+    public static bool Radio(string label, ref int current, int value)
+    {
+        using (PushCheckStyle())
+            return ImGui.RadioButton(label, ref current, value);
+    }
 
     public static CheckboxGroupScope CheckboxGroup(string label, ref bool value)
     {
-        var changed = ImGui.Checkbox(label, ref value);
+        var changed = Checkbox(label, ref value);
         ImGui.Indent();
         return new CheckboxGroupScope(changed);
+    }
+
+    private static ImRaii.StyleDisposable PushCheckStyle()
+    {
+        var pad = MirageLayout.Style.FramePadding;
+        var padY = ResolveInputFramePadding().Y;
+        return ImRaii
+            .PushStyle(ImGuiStyleVar.FramePadding, new Vector2(pad.X, padY))
+            .Push(ImGuiStyleVar.FrameRounding, InputStyle.FrameRounding);
     }
 
     public static void Text(

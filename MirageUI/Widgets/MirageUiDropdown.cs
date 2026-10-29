@@ -48,6 +48,48 @@ public static partial class MirageUi
         return changed;
     }
 
+    public static bool MultiSelectDropdown(
+        string label,
+        string preview,
+        IReadOnlyList<string> items,
+        HashSet<string> selected,
+        string id = "",
+        float width = InputWidthFill,
+        bool? liveMatch = null,
+        string? matchTooltip = null,
+        float labelWidth = FieldLabelColumnWidth)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(selected);
+        if (!BeginDropdown(
+                label,
+                preview,
+                id,
+                width,
+                hasValue: selected.Count > 0,
+                liveMatch: liveMatch,
+                matchTooltip: matchTooltip,
+                labelWidth: labelWidth))
+            return false;
+
+        var changed = false;
+        foreach (var item in items)
+        {
+            var isSelected = selected.Contains(item);
+            if (!ImGui.Selectable(item, isSelected, ImGuiSelectableFlags.DontClosePopups))
+                continue;
+
+            if (isSelected)
+                selected.Remove(item);
+            else
+                selected.Add(item);
+            changed = true;
+        }
+
+        EndDropdown();
+        return changed;
+    }
+
     public static bool SearchableDropdown(
         string label,
         ref string selected,
@@ -306,6 +348,7 @@ public static partial class MirageUi
         var headerHovered = WithAlpha(accent, 0.48f);
         var headerActive = WithAlpha(accent, 0.60f);
         var popupBg = MixColors(settings.WindowBg, accent, 0.08f);
+        popupBg.W = 0.96f;
         return (frame, hovered, active, border, header, headerHovered, headerActive, popupBg);
     }
 }
