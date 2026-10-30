@@ -54,6 +54,15 @@ public sealed class MirageColorSettings
 
     public void SetColor(MirageUi.Color color, Vector4 value) => _colors[(int)color] = value;
 
+    public const string WhiteThemeId = "mirageui-white";
+    public const string BlackThemeId = "mirageui-black";
+
+    public static bool IsBuiltinTheme(string? id) =>
+        id is WhiteThemeId or BlackThemeId;
+
+    public static MirageColorSettings CreateBuiltin(string? id) =>
+        id == BlackThemeId ? CreateBlack() : CreateWhite();
+
     public static MirageColorSettings CreateDefault() => CreateWhite();
 
     public static MirageColorSettings CreateWhite()
