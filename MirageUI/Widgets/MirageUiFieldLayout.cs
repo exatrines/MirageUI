@@ -1,5 +1,4 @@
 using Dalamud.Interface;
-using MirageUI.Theme;
 using MirageUI.Ui;
 
 namespace MirageUI;
@@ -18,7 +17,8 @@ public static partial class MirageUi
         bool? liveMatch = null,
         string? matchTooltip = null,
         float labelWidth = FieldLabelColumnWidth,
-        float controlWidth = 0f)
+        float controlWidth = 0f,
+        string? info = null)
     {
         usedTable = false;
         if (string.IsNullOrEmpty(label))
@@ -41,6 +41,9 @@ public static partial class MirageUi
             labelFixed = true;
             labelWidth = FieldLabelColumnWidth;
         }
+
+        if (labelFixed && !string.IsNullOrEmpty(info))
+            labelWidth += ImGui.GetFrameHeight() + ImGui.GetStyle().ItemInnerSpacing.X;
 
         var columnCount = labelFixed && controlFixed ? 3 : 2;
         if (!ImGui.BeginTable(
@@ -68,6 +71,8 @@ public static partial class MirageUi
         ImGui.TableNextColumn();
         ImGui.AlignTextToFramePadding();
         ImGui.TextUnformatted(label);
+        if (!string.IsNullOrEmpty(info))
+            InfoButton(info, string.IsNullOrEmpty(id) ? $"##MirageInfo_{label}" : $"##MirageInfo_{id}");
 
         if (columnCount == 3)
             ImGui.TableNextColumn();

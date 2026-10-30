@@ -10,12 +10,13 @@ public static partial class MirageUi
         string format = "%.1f",
         string id = "",
         float width = InputWidthFill,
-        float labelWidth = FieldLabelColumnWidth)
+        float labelWidth = FieldLabelColumnWidth,
+        string? info = null)
     {
         value = Math.Clamp(value, min, max);
 
         var fieldId = string.IsNullOrEmpty(id) ? label : id;
-        if (!BeginFieldRow(label, fieldId, out var usedTable, labelWidth: labelWidth, controlWidth: width))
+        if (!BeginFieldRow(label, fieldId, out var usedTable, labelWidth: labelWidth, controlWidth: width, info: info))
             return false;
 
         PushInputChrome();

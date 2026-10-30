@@ -22,6 +22,12 @@ public static class MirageWindowHeader
     private static bool _leftWasDown;
     private static uint _backdropWindow;
     private static int _backdropFrame = -1;
+    private static Window? _host;
+    private static Window? _dragWindow;
+    private static Vector2 _dragMouseStart;
+    private static Vector2 _dragWindowStart;
+    private static Vector2 _itemPressPos;
+    private static bool _itemPressMoved;
 
     public const string PluginPageId = "plugin";
 
@@ -96,6 +102,7 @@ public static class MirageWindowHeader
             : ImDrawFlags.RoundCornersTop;
         FillChrome(origin, origin + new Vector2(width, height), corners);
 
+        _host = window;
         ImGui.SetCursorPos(Vector2.Zero);
         ImGui.InvisibleButton("##HeaderDrag"u8, new Vector2(Math.Max(1f, buttonsX), height));
         if (!window.IsPinned
@@ -103,8 +110,7 @@ public static class MirageWindowHeader
             && ImGui.IsItemActive()
             && ImGui.IsMouseDragging(ImGuiMouseButton.Left))
         {
-            window.Position = ImGui.GetWindowPos() + ImGui.GetIO().MouseDelta;
-            window.PositionCondition = ImGuiCond.Always;
+            Place(window, ImGui.GetWindowPos() + ImGui.GetIO().MouseDelta);
         }
 
         var textSize = ImGui.CalcTextSize(title);
@@ -194,6 +200,81 @@ public static class MirageWindowHeader
             ImGui.GetColorU32(ImGuiCol.Separator));
 
         ImGui.SetCursorPos(new Vector2(leftInset, height));
+    }
+
+    public static void DragClientArea(Window window)
+    {
+        if (window.IsPinned || window.IsClickthrough)
+        {
+            if (_dragWindow == window)
+                _dragWindow = null;
+            return;
+        }
+
+        if (ImGui.IsMouseReleased(ImGuiMouseButton.Left))
+        {
+            if (_dragWindow == window)
+                _dragWindow = null;
+            _itemPressMoved = false;
+        }
+
+        if (_dragWindow == window && ImGui.IsMouseDown(ImGuiMouseButton.Left))
+        {
+            var delta = ImGui.GetIO().MousePos - _dragMouseStart;
+            Place(window, _dragWindowStart + delta);
+            return;
+        }
+
+        if (ImGui.IsPopupOpen(string.Empty, ImGuiPopupFlags.AnyPopupId))
+            return;
+        if (!ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows))
+            return;
+        if (ImGui.IsAnyItemActive())
+            return;
+        if (!ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+            return;
+
+        BeginClientDrag(window, ImGui.GetIO().MousePos);
+    }
+
+    private static void Place(Window window, Vector2 position)
+    {
+        window.Position = position;
+        window.PositionCondition = ImGuiCond.Always;
+    }
+
+    private static bool BlockedByClientDrag()
+    {
+        if (_host == null || _host.IsPinned || _host.IsClickthrough)
+            return false;
+
+        var io = ImGui.GetIO();
+        if (ImGui.IsItemActivated())
+        {
+            _itemPressPos = io.MousePos;
+            _itemPressMoved = false;
+        }
+
+        if (!ImGui.IsItemActive())
+            return false;
+        if (_itemPressMoved)
+            return _dragWindow == _host;
+
+        var delta = io.MousePos - _itemPressPos;
+        var threshold = Math.Max(4f, io.MouseDragThreshold);
+        if (delta.LengthSquared() < threshold * threshold)
+            return false;
+
+        _itemPressMoved = true;
+        BeginClientDrag(_host, io.MousePos);
+        return true;
+    }
+
+    private static void BeginClientDrag(Window window, Vector2 mousePos)
+    {
+        _dragWindow = window;
+        _dragMouseStart = mousePos;
+        _dragWindowStart = ImGui.GetWindowPos();
     }
 
     public static void DrawBackdrop()
@@ -499,7 +580,8 @@ public static class MirageWindowHeader
         }
 
         ImGui.SetCursorScreenPos(pos);
-        if (ImGui.InvisibleButton("##PluginMark"u8, size) && !selected)
+        var markClicked = ImGui.InvisibleButton("##PluginMark"u8, size);
+        if (!BlockedByClientDrag() && markClicked && !selected)
             selectedId = PluginPageId;
 
         return icon;
@@ -556,6 +638,8 @@ public static class MirageWindowHeader
         var pressed = ImGuiP.ButtonBehavior(bb, widgetId, ref hovered, ref held, ImGuiButtonFlags.None);
         if (pressed)
             ImGuiP.MarkItemEdited(widgetId);
+        if (BlockedByClientDrag())
+            return false;
 
         return pressed;
     }
@@ -591,13 +675,13 @@ public static class MirageWindowHeader
         var pinned = window.IsPinned;
         if (MirageUi.Checkbox(pin, ref pinned))
             window.IsPinned = pinned;
-        MenuInfo("##MenuPinInfo", pinInfo);
+        MirageUi.InfoButton(pinInfo, "##MenuPinInfo");
 
         ImGui.SameLine();
         var clickthrough = window.IsClickthrough;
         if (MirageUi.Checkbox(clickthroughLabel, ref clickthrough))
             window.IsClickthrough = clickthrough;
-        MenuInfo("##MenuClickthroughInfo", clickthroughInfo);
+        MirageUi.InfoButton(clickthroughInfo, "##MenuClickthroughInfo");
 
         ImGui.Separator();
 
@@ -640,18 +724,6 @@ public static class MirageWindowHeader
         var copy = ImGui.CalcTextSize(copyScreenshot).X + (pad.X + 6f) * 2f
             + style.ItemSpacing.X + MirageUi.ResolveControlHeight();
         return MathF.Max(PreviewLimitUnscaled * ImGuiHelpers.GlobalScale, MathF.Max(checks, copy));
-    }
-
-    private static void MenuInfo(string id, string tooltip)
-    {
-        var frame = ImGui.GetFrameHeight();
-        ImGui.SameLine(0f, ImGui.GetStyle().ItemInnerSpacing.X);
-        MirageUi.IconButton(
-            FontAwesomeIcon.InfoCircle,
-            id: id,
-            size: new Vector2(frame, frame),
-            color: MirageUi.GetColor(MirageUi.Color.Secondary),
-            tooltip: tooltip);
     }
 
     private static Vector2 PreviewSize(Vector2 size, float limit)
