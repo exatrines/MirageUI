@@ -267,7 +267,7 @@ public static partial class MirageUi
 
         MirageLayout.Cursor.ScreenPosition = new Vector2(contentX, bodyY);
         ImGui.PushItemWidth(contentWidth);
-        ImGui.PushTextWrapPos(contentX + contentWidth);
+        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + contentWidth);
         drawBody();
         ImGui.PopTextWrapPos();
         ImGui.PopItemWidth();

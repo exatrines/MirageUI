@@ -25,9 +25,9 @@ public sealed class MirageWindowFeature
 
     public string? Label { get; init; }
 
-    public string? Tooltip { get; init; }
+    public string? Tooltip { get; set; }
 
-    public string? OpenPageLabel { get; init; }
+    public string? OpenPageLabel { get; set; }
 
     public Action<string>? DrawPopup { get; init; }
 

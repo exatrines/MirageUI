@@ -34,6 +34,10 @@ public sealed class MirageTwoColumnState
 
     public string? SelectedId { get; set; }
 
+    public bool MultiSelect { get; set; }
+
+    public HashSet<string> SelectedIds { get; } = new(StringComparer.Ordinal);
+
     public string SearchFilter { get; set; } = string.Empty;
 
     public bool ScrollSelectedIntoView { get; set; }
@@ -45,6 +49,8 @@ public sealed class MirageTwoColumnState
     public Action<string>? OnSelectionChanged { get; set; }
 
     public Action<string>? OnSearchFilterChanged { get; set; }
+
+    public IList<MirageTwoColumnTrailingAction> SearchLeadingActions { get; init; } = [];
 
     public IList<MirageTwoColumnTrailingAction> SearchTrailingActions { get; init; } = [];
 

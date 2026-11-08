@@ -192,7 +192,7 @@ internal static class TwoColumnLayout
     {
         var framePadding = state.SearchFramePadding * scale;
         var inputHeight = ImGui.GetFontSize() + framePadding.Y * 2f;
-        if (state.SearchTrailingActions.Count == 0)
+        if (state.SearchLeadingActions.Count == 0 && state.SearchTrailingActions.Count == 0)
             return inputHeight;
 
         return Math.Max(inputHeight, MirageUi.ResolveControlHeight());
@@ -232,10 +232,15 @@ internal static class TwoColumnLayout
             .PushStyle(ImGuiStyleVar.FramePadding, framePadding)
             .Push(ImGuiStyleVar.FrameRounding, 3);
 
+        var leading = state.SearchLeadingActions;
         var actions = state.SearchTrailingActions;
         var buttonSize = MirageUi.ResolveControlHeight();
         var gap = MirageLayout.Style.ItemInnerSpacing.X;
+        var hasLeading = leading.Count > 0;
         var hasActions = actions.Count > 0;
+        var leadingWidth = hasLeading
+            ? (leading.Count * buttonSize) + ((leading.Count - 1) * gap)
+            : 0f;
         var actionsWidth = hasActions
             ? (actions.Count * buttonSize) + ((actions.Count - 1) * gap)
             : 0f;
@@ -245,7 +250,14 @@ internal static class TwoColumnLayout
             : gap + buttonSize;
         var searchWidth = Math.Max(
             40f,
-            MirageLayout.Style.ContentRegionAvail.X - actionsWidth - (hasActions ? gap : 0f) - closeWidth);
+            MirageLayout.Style.ContentRegionAvail.X
+            - leadingWidth - (hasLeading ? gap : 0f)
+            - actionsWidth - (hasActions ? gap : 0f)
+            - closeWidth);
+
+        DrawSearchActions(leading, buttonSize, gap);
+        if (hasLeading)
+            ImGui.SameLine(0f, gap);
 
         var searchFilter = state.SearchFilter;
         var changed = MirageUi.SearchFilter(
@@ -260,27 +272,7 @@ internal static class TwoColumnLayout
         if (hasActions)
         {
             ImGui.SameLine(0f, gap);
-            for (var i = 0; i < actions.Count; i++)
-            {
-                var action = actions[i];
-                using var actionId = ImRaii.PushId(action.Id);
-                if (i > 0)
-                    ImGui.SameLine(0f, gap);
-
-                if (MirageUi.IconButton(
-                        action.Icon,
-                        "##searchTrail",
-                        new Vector2(buttonSize, buttonSize),
-                        tooltip: action.Tooltip))
-                {
-                    if (action.ContextMenuItems.Count > 0)
-                        ImGui.OpenPopup("##TrailContext");
-                    else
-                        action.OnClick?.Invoke();
-                }
-
-                DrawSearchActionMenu(action);
-            }
+            DrawSearchActions(actions, buttonSize, gap);
         }
 
         var inputHeight = GetSearchInputHeight(scale, state);
@@ -302,7 +294,7 @@ internal static class TwoColumnLayout
         if (MenuToggleButton(buttonSize))
             state.SidebarCollapsed = true;
 
-        if (!changed || !state.AutoSelectFirstOnSearch)
+        if (!changed || !state.AutoSelectFirstOnSearch || state.MultiSelect)
             return;
 
         // Keep selection when clearing; jump to first match while filtering.
@@ -318,6 +310,34 @@ internal static class TwoColumnLayout
         state.OnSelectionChanged?.Invoke(firstEntry.Id);
     }
 
+    private static void DrawSearchActions(
+        IList<MirageTwoColumnTrailingAction> actions,
+        float buttonSize,
+        float gap)
+    {
+        for (var i = 0; i < actions.Count; i++)
+        {
+            var action = actions[i];
+            using var actionId = ImRaii.PushId(action.Id);
+            if (i > 0)
+                ImGui.SameLine(0f, gap);
+
+            if (MirageUi.IconButton(
+                    action.Icon,
+                    "##searchAction",
+                    new Vector2(buttonSize, buttonSize),
+                    tooltip: action.Tooltip))
+            {
+                if (action.ContextMenuItems.Count > 0)
+                    ImGui.OpenPopup("##SearchActionMenu");
+                else
+                    action.OnClick?.Invoke();
+            }
+
+            DrawSearchActionMenu(action);
+        }
+    }
+
     private static void DrawSearchActionMenu(MirageTwoColumnTrailingAction action)
     {
         if (action.ContextMenuItems.Count == 0)
@@ -328,7 +348,7 @@ internal static class TwoColumnLayout
             labels[i] = action.ContextMenuItems[i].Label;
 
         var style = MirageContextMenuStyle.CreateDefault();
-        if (!MirageUi.ContextMenu.Begin("##TrailContext", labels, style))
+        if (!MirageUi.ContextMenu.Begin("##SearchActionMenu", labels, style))
             return;
 
         foreach (var item in action.ContextMenuItems)
@@ -413,6 +433,16 @@ internal static class TwoColumnLayout
     private static bool UsesGroupedSidebar(MirageTwoColumnState state) =>
         state.SidebarNodes.Count > 0;
 
+    private static bool IsRowSelected(MirageTwoColumnState state, string id) =>
+        state.MultiSelect ? state.SelectedIds.Contains(id) : state.SelectedId == id;
+
+    private static void ToggleMultiSelect(MirageTwoColumnState state, string id)
+    {
+        if (!state.SelectedIds.Add(id))
+            state.SelectedIds.Remove(id);
+        state.OnSelectionChanged?.Invoke(id);
+    }
+
     private static void DrawFolderNode(
         MirageTwoColumnState state,
         MirageTwoColumnFolderNode folder,
@@ -429,18 +459,32 @@ internal static class TwoColumnLayout
             || forceExpanded
             || !state.CollapsedFolderIds.Contains(folder.Id);
 
-        if (ListSelectable.DrawFolderHeader(
-                folder.Label,
-                expanded,
-                rowHeight,
-                canCollapse: !folder.AlwaysExpanded)
-            && !folder.AlwaysExpanded
-            && !forceExpanded)
+        var action = ListSelectable.DrawFolderHeader(
+            folder.Label,
+            expanded,
+            rowHeight,
+            canCollapse: !folder.AlwaysExpanded,
+            selected: IsRowSelected(state, folder.Id),
+            selectable: folder.Selectable,
+            gameIconId: folder.GameIconId);
+        if (action.Toggle && !folder.AlwaysExpanded && !forceExpanded)
         {
             if (expanded)
                 state.CollapsedFolderIds.Add(folder.Id);
             else
                 state.CollapsedFolderIds.Remove(folder.Id);
+        }
+
+        if (action.Select)
+        {
+            MiragePluginPage.Hide();
+            if (state.MultiSelect)
+                ToggleMultiSelect(state, folder.Id);
+            else
+            {
+                state.SelectedId = folder.Id;
+                state.OnSelectionChanged?.Invoke(folder.Id);
+            }
         }
 
         MirageLayout.Cursor.Y = rowStart.Y + rowHeight + state.ItemSpacing * scale;
@@ -576,6 +620,8 @@ internal static class TwoColumnLayout
                         Label = folder.Label,
                         Entries = matchingEntries,
                         AlwaysExpanded = folder.AlwaysExpanded,
+                        Selectable = folder.Selectable,
+                        GameIconId = folder.GameIconId,
                     };
                     break;
             }
@@ -694,14 +740,16 @@ internal static class TwoColumnLayout
             ImGui.SameLine(0, MirageLayout.Style.ItemInnerSpacing.X);
         }
 
-        var isSelected = state.SelectedId == entry.Id;
+        var isSelected = IsRowSelected(state, entry.Id);
         var pressed = ListSelectable.Draw(
             entry.Label,
             isSelected,
             rowHeight,
             labelIndent,
             dimmed: isDragSource,
-            labelColor: entry.LabelColor);
+            labelColor: entry.LabelColor,
+            gameIcons: entry.GameIconIds,
+            icon: entry.Icon);
 
         if (reorderEnabled
             && ImGui.IsItemActive()
@@ -719,25 +767,35 @@ internal static class TwoColumnLayout
             if (pluginPageWasVisible && isSelected)
                 return;
 
-            string? nextId;
-            if (isSelected && state.AllowDeselect)
-                nextId = null;
+            if (state.MultiSelect)
+            {
+                ToggleMultiSelect(state, entry.Id);
+            }
             else
-                nextId = entry.Id;
+            {
+                string? nextId;
+                if (isSelected && state.AllowDeselect)
+                    nextId = null;
+                else
+                    nextId = entry.Id;
 
-            state.SelectedId = nextId;
-            if (nextId != null)
-                state.OnSelectionChanged?.Invoke(nextId);
-            else
-                state.OnSelectionChanged?.Invoke(string.Empty);
+                state.SelectedId = nextId;
+                if (nextId != null)
+                    state.OnSelectionChanged?.Invoke(nextId);
+                else
+                    state.OnSelectionChanged?.Invoke(string.Empty);
+            }
         }
 
         if (entry.ContextMenuItems.Count > 0
             && ImGui.IsItemHovered()
             && ImGui.IsMouseClicked(ImGuiMouseButton.Right))
         {
-            state.SelectedId = entry.Id;
             MiragePluginPage.Hide();
+            if (state.MultiSelect)
+                state.SelectedIds.Add(entry.Id);
+            else
+                state.SelectedId = entry.Id;
             state.OnSelectionChanged?.Invoke(entry.Id);
             ImGui.OpenPopup("##EntryContext");
         }

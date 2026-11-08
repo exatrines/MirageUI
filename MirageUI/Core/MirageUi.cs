@@ -68,6 +68,9 @@ public static partial class MirageUi
     public static void Dispose()
     {
         I18n.Reset();
+        ResetLanguage();
+        MirageThemes.Reset();
+        MirageThemePage.Reset();
         DisposePluginPage();
         ImageRegistry.Dispose();
         FontRegistry.Dispose();

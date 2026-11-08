@@ -96,7 +96,7 @@ public static partial class MirageUi
             Register(language, entries);
         }
 
-        private static bool IsJapaneseCode(string? language) =>
+        internal static bool IsJapaneseCode(string? language) =>
             language != null && language.StartsWith(Japanese, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -90,6 +90,41 @@ public static partial class MirageUi
         return changed;
     }
 
+    public static bool IconMultiSelectDropdown(
+        string label,
+        string preview,
+        IReadOnlyList<(uint Id, uint IconId, string Label)> items,
+        HashSet<uint> selected,
+        string id = "",
+        float width = InputWidthFill,
+        float labelWidth = FieldLabelColumnWidth)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(selected);
+        if (!BeginDropdown(
+                label,
+                preview,
+                id,
+                width,
+                hasValue: selected.Count > 0,
+                comboFlags: ImGuiComboFlags.HeightLargest,
+                labelWidth: labelWidth))
+            return false;
+
+        var snapshot = selected.ToHashSet();
+        var rowHeight = ImGui.GetFrameHeight() + ImGui.GetStyle().ItemSpacing.Y;
+        var rows = Math.Max(1, (items.Count + 1) / 2);
+        var height = Math.Clamp(rowHeight * rows, rowHeight, rowHeight * 8f);
+        using (var child = ImRaii.Child($"{id}-scroll", new Vector2(0f, height), false))
+        {
+            if (child)
+                IconLabelToggleGrid($"{id}-grid", items, selected, columns: 2);
+        }
+
+        EndDropdown();
+        return !selected.SetEquals(snapshot);
+    }
+
     public static bool SearchableDropdown(
         string label,
         ref string selected,

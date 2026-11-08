@@ -5,6 +5,12 @@ namespace MirageUI;
 
 public static partial class MirageUi
 {
+    public static MirageMessageButton Yes(Action? onClick = null) =>
+        new() { Label = I18n.Get("message.yes"), Primary = true, OnClick = onClick };
+
+    public static MirageMessageButton No() =>
+        new() { Label = I18n.Get("message.no") };
+
     public static class Message
     {
         private const float PanelRounding = 6f;

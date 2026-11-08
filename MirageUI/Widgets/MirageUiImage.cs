@@ -59,35 +59,78 @@ public static partial class MirageUi
         return found;
     }
 
-    public static void ImageFrame(IDalamudTextureWrap? texture, Vector2 min, Vector2 max)
+    public static bool FramedGameIcon(uint iconId, Vector2 min, Vector2 max, bool muted = false)
+    {
+        IDalamudTextureWrap? texture = null;
+        if (iconId != 0 && TryGetGameIcon(iconId, out var loaded, hiRes: false))
+            texture = loaded;
+
+        ImageFrame(texture, min, max, Vector2.Zero, Vector2.One, muted, GameIconFit);
+        return texture != null;
+    }
+
+    public static void ImageFrame(IDalamudTextureWrap? texture, Vector2 min, Vector2 max) =>
+        ImageFrame(texture, min, max, Vector2.Zero, Vector2.One, muted: false);
+
+    public static void ImageFrame(
+        IDalamudTextureWrap? texture,
+        Vector2 min,
+        Vector2 max,
+        Vector2 uv0,
+        Vector2 uv1,
+        bool muted,
+        float fit = 1f)
     {
         var settings = MirageTheme.Active ?? ResolveAppliedColors();
         var accent = settings.GetColor(Color.Accent);
         var (fill, _, _, border, _, _, _, _) = GetDropdownColors(settings, accent);
         var rounding = InputStyle.FrameRounding;
-        using (ImRaii.PushColor(ImGuiCol.Border, border))
-        using (ImRaii.PushStyle(ImGuiStyleVar.FrameBorderSize, 1f))
-            ImGuiP.RenderFrame(min, max, ToUInt(fill), true, rounding);
+        var draw = ImGui.GetWindowDrawList();
+        draw.AddRectFilled(min, max, ToUInt(fill), rounding);
 
-        if (texture == null)
-            return;
+        if (texture != null)
+        {
+            var pad = new Vector2(1f, 1f);
+            var innerMin = min + pad;
+            var innerMax = max - pad;
+            if (fit > 0f && fit < 1f)
+            {
+                var inner = innerMax - innerMin;
+                var drawn = inner * fit;
+                var origin = innerMin + (inner - drawn) * 0.5f;
+                innerMin = origin;
+                innerMax = origin + drawn;
+            }
 
-        var pad = new Vector2(1f, 1f);
-        var innerMin = min + pad;
-        var innerMax = max - pad;
-        if (innerMax.X - innerMin.X < 1f || innerMax.Y - innerMin.Y < 1f)
-            return;
+            if (innerMax.X - innerMin.X >= 1f && innerMax.Y - innerMin.Y >= 1f)
+            {
+                var tint = muted
+                    ? ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.35f))
+                    : uint.MaxValue;
+                var radius = MathF.Max(0f, rounding - (innerMin.X - min.X));
+                if (radius >= 0.5f)
+                {
+                    draw.AddImageRounded(
+                        texture.Handle,
+                        innerMin,
+                        innerMax,
+                        uv0,
+                        uv1,
+                        tint,
+                        radius,
+                        ImDrawFlags.RoundCornersAll);
+                }
+                else
+                {
+                    draw.AddImage(texture.Handle, innerMin, innerMax, uv0, uv1, tint);
+                }
+            }
+        }
 
-        ImGui.GetWindowDrawList().AddImageRounded(
-            texture.Handle,
-            innerMin,
-            innerMax,
-            Vector2.Zero,
-            Vector2.One,
-            uint.MaxValue,
-            MathF.Max(0f, rounding - 1f),
-            ImDrawFlags.RoundCornersAll);
+        draw.AddRect(min, max, ToUInt(border), rounding, ImDrawFlags.RoundCornersAll, 1f);
     }
+
+    private const float GameIconFit = 0.94f;
 
     private static bool DrawSizedImage(
         IDalamudTextureWrap texture,
@@ -111,6 +154,9 @@ public static partial class MirageUi
 
     public static bool TryGetGameIcon(uint iconId, out IDalamudTextureWrap texture, bool hiRes = true) =>
         ImageRegistry.TryGetGameIcon(iconId, hiRes, out texture!);
+
+    public static bool TryGetTexture(string path, out IDalamudTextureWrap texture) =>
+        ImageRegistry.TryGetWrap(path, out texture);
 
     private static void DrawImage(IDalamudTextureWrap texture, Vector2 size, bool isCircle, float rounding)
     {

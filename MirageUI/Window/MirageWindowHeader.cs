@@ -37,6 +37,15 @@ public static class MirageWindowHeader
 
     public readonly record struct Section(string Id, string Label, FontAwesomeIcon Icon);
 
+    [Flags]
+    public enum Chrome
+    {
+        Menu = 1,
+        Collapse = 2,
+        Close = 4,
+        Standard = Menu | Collapse | Close,
+    }
+
     public static float BarHeight => BarHeightUnscaled * ImGuiHelpers.GlobalScale;
 
     public static float RailWidth(
@@ -76,7 +85,8 @@ public static class MirageWindowHeader
         ref bool collapsed,
         float leftInset,
         ref string pageId,
-        IReadOnlyList<MirageWindowFeature>? features = null)
+        IReadOnlyList<MirageWindowFeature>? features = null,
+        Chrome chrome = Chrome.Standard)
     {
         DrawBackdrop();
         var scale = ImGuiHelpers.GlobalScale;
@@ -88,8 +98,16 @@ public static class MirageWindowHeader
         var side = SidePaddingUnscaled * scale;
         var titleFeatures = OrderedTitle(features);
         var customCount = titleFeatures.Count;
-        var groupSplit = customCount > 0 ? gap + 1f : 0f;
-        var buttonsWidth = button * (customCount + 3) + gap * (customCount + 2) + groupSplit;
+        var chromeCount = 0;
+        if ((chrome & Chrome.Menu) != 0)
+            chromeCount++;
+        if ((chrome & Chrome.Collapse) != 0)
+            chromeCount++;
+        if ((chrome & Chrome.Close) != 0)
+            chromeCount++;
+        var groupSplit = customCount > 0 && chromeCount > 0 ? gap + 1f : 0f;
+        var buttonCount = customCount + chromeCount;
+        var buttonsWidth = button * buttonCount + gap * Math.Max(0, buttonCount - 1) + groupSplit;
         var buttonsX = width - side - buttonsWidth;
         var clickthrough = window.IsClickthrough;
         var leftDown = clickthrough && (GetKeyState(0x01) & 0x8000) != 0;
@@ -134,7 +152,7 @@ public static class MirageWindowHeader
             var opensPage = feature.TitleKind == MirageWindowFeatureKind.OpenPage
                 && !string.IsNullOrEmpty(feature.PageId);
             var shortcut = feature.TitleKind == MirageWindowFeatureKind.Shortcut;
-            if (IconButton($"##Title{feature.Id}", feature.Icon, min, button, clickthrough, leftPressed))
+            if (IconButton($"##Title{feature.Id}", feature.Icon, min, button, clickthrough, leftPressed, feature.Tooltip))
             {
                 if (opensPage)
                 {
@@ -163,7 +181,7 @@ public static class MirageWindowHeader
             x += button + gap;
         }
 
-        if (customCount > 0)
+        if (customCount > 0 && chromeCount > 0)
         {
             var inset = 4f * scale;
             ImGui.GetWindowDrawList().AddLine(
@@ -173,24 +191,30 @@ public static class MirageWindowHeader
             x += 1f + gap;
         }
 
-        var menuMin = new Vector2(x, buttonY);
-        if (IconButton("##Menu", FontAwesomeIcon.Bars, menuMin, button, clickthrough, leftPressed))
-            ImGui.OpenPopup("##WindowMenu");
-        if (ImGui.IsPopupOpen("##WindowMenu"))
+        if ((chrome & Chrome.Menu) != 0)
         {
-            ImGui.SetNextWindowPos(new Vector2(menuMin.X, buttonY + button + popupGap), ImGuiCond.Appearing);
+            var menuMin = new Vector2(x, buttonY);
+            if (IconButton("##Menu", FontAwesomeIcon.Bars, menuMin, button, clickthrough, leftPressed))
+                ImGui.OpenPopup("##WindowMenu");
+            if (ImGui.IsPopupOpen("##WindowMenu"))
+                ImGui.SetNextWindowPos(new Vector2(menuMin.X, buttonY + button + popupGap), ImGuiCond.Appearing);
+
+            x += button + gap;
+            DrawMenu(window);
         }
 
-        x += button + gap;
-        var collapseIcon = collapsed ? FontAwesomeIcon.ChevronDown : FontAwesomeIcon.ChevronUp;
-        if (IconButton("##Collapse", collapseIcon, new Vector2(x, buttonY), button, clickthrough, leftPressed))
-            collapsed = !collapsed;
+        if ((chrome & Chrome.Collapse) != 0)
+        {
+            var collapseIcon = collapsed ? FontAwesomeIcon.ChevronDown : FontAwesomeIcon.ChevronUp;
+            if (IconButton("##Collapse", collapseIcon, new Vector2(x, buttonY), button, clickthrough, leftPressed))
+                collapsed = !collapsed;
 
-        x += button + gap;
-        if (IconButton("##Close", FontAwesomeIcon.Times, new Vector2(x, buttonY), button, clickthrough, leftPressed))
+            x += button + gap;
+        }
+
+        if ((chrome & Chrome.Close) != 0
+            && IconButton("##Close", FontAwesomeIcon.Times, new Vector2(x, buttonY), button, clickthrough, leftPressed))
             window.IsOpen = false;
-
-        DrawMenu(window);
 
         var lineY = origin.Y + height - 1f;
         var splitX = origin.X + leftInset;

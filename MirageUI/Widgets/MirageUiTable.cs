@@ -17,6 +17,8 @@ public sealed class MirageTableColumn
     public bool Stretch { get; init; }
 
     public MirageTableAlign Align { get; init; } = MirageTableAlign.Left;
+
+    public Action? DrawHeader { get; init; }
 }
 
 public static partial class MirageUi
@@ -134,7 +136,7 @@ public static partial class MirageUi
                 new Vector2(contentLeft, contentTop),
                 new Vector2(contentLeft + gridWidth, origin.Y + outer.Y),
                 () => DrawColumns(id + "##head", contentWidth, widths, columns, header: true, null));
-            var headerH = MathF.Max(1f, ImGui.GetCursorScreenPos().Y - contentTop);
+            var headerH = MathF.Max(1f, ImGui.GetCursorScreenPos().Y - contentTop - style.ItemSpacing.Y);
 
             var footerH = drawAddRow == null
                 ? 0f
@@ -282,6 +284,13 @@ public static partial class MirageUi
             for (var i = 0; i < columns.Count; i++)
             {
                 ImGui.TableSetColumnIndex(i);
+                if (columns[i].DrawHeader is { } drawHeader)
+                {
+                    using (ImRaii.PushColor(ImGuiCol.Text, GetColor(Color.Default)))
+                        drawHeader();
+                    continue;
+                }
+
                 var label = columns[i].Label;
                 if (string.IsNullOrEmpty(label))
                     continue;

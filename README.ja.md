@@ -313,4 +313,4 @@ Cursor.Y += 8f;
 
 ## ライセンス
 
-AGPL-3.0-or-later
+[MIT](LICENSE)

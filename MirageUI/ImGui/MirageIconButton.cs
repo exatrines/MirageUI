@@ -98,7 +98,7 @@ internal static class MirageIconButton
     }
 
     // Center the painted glyph, not the font advance box. Advance centering leaves the ink left of the frame.
-    private static unsafe Vector2 IconOrigin(Vector2 boxMin, Vector2 boxSize, string label)
+    internal static unsafe Vector2 IconOrigin(Vector2 boxMin, Vector2 boxSize, string label)
     {
         var font = ImGui.GetFont();
         var glyph = label.Length > 0 ? font.FindGlyph(label[0]) : null;

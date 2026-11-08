@@ -40,7 +40,8 @@ public static partial class MirageUi
         int max,
         string id = "",
         float width = InputWidthFill,
-        float labelWidth = FieldLabelColumnWidth)
+        float labelWidth = FieldLabelColumnWidth,
+        string format = "")
     {
         value = Math.Clamp(value, min, max);
 
@@ -53,7 +54,9 @@ public static partial class MirageUi
         {
             ImGui.SetNextItemWidth(ResolveFieldControlWidth(width, usedTable));
             var widgetId = string.IsNullOrEmpty(id) ? $"##{label}" : $"##{id}";
-            return ImGui.SliderInt(widgetId, ref value, min, max);
+            return string.IsNullOrEmpty(format)
+                ? ImGui.SliderInt(widgetId, ref value, min, max)
+                : ImGui.SliderInt(widgetId, ref value, min, max, format);
         }
         finally
         {

@@ -6,9 +6,11 @@ public sealed class MirageTwoColumnEntry
 {
     public required string Id { get; init; }
 
-    public required string Label { get; init; }
+    public required string Label { get; set; }
 
     public FontAwesomeIcon Icon { get; init; } = FontAwesomeIcon.Circle;
+
+    public uint[] GameIconIds { get; init; } = [];
 
     public MirageTwoColumnEntryKind Kind { get; init; } = MirageTwoColumnEntryKind.Default;
 

@@ -45,10 +45,11 @@ public static partial class MirageUi
         float width = InputWidthFill,
         bool? liveMatch = null,
         string? matchTooltip = null,
-        float labelWidth = FieldLabelColumnWidth)
+        float labelWidth = FieldLabelColumnWidth,
+        string? info = null)
     {
         var fieldId = string.IsNullOrEmpty(id) ? label : id;
-        if (!BeginFieldRow(label, fieldId, out var usedTable, liveMatch, matchTooltip, labelWidth, width))
+        if (!BeginFieldRow(label, fieldId, out var usedTable, liveMatch, matchTooltip, labelWidth, width, info))
             return false;
 
         PushInputChrome();

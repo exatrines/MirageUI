@@ -1,6 +1,7 @@
 namespace MirageUI.Layout;
 
 using Dalamud.Interface;
+using Dalamud.Interface.Textures.TextureWraps;
 
 internal static class ListSelectable
 {
@@ -11,7 +12,9 @@ internal static class ListSelectable
         float indent = 0f,
         float trailingWidth = 0f,
         bool dimmed = false,
-        Vector4? labelColor = null)
+        Vector4? labelColor = null,
+        uint[]? gameIcons = null,
+        FontAwesomeIcon icon = FontAwesomeIcon.Circle)
     {
         var g = ImGui.GetCurrentContext();
         var window = ImGuiP.GetCurrentWindow();
@@ -53,6 +56,43 @@ internal static class ListSelectable
         ImGuiP.RenderNavHighlight(bb, id, ImGuiNavHighlightFlags.TypeThin | ImGuiNavHighlightFlags.NoRounding);
 
         var padding = MirageLayout.Style.FramePadding;
+        var textMin = bb.Min + padding;
+        var iconGap = MirageLayout.Style.ItemInnerSpacing.X;
+        var cursorX = bb.Min.X + padding.X;
+        var labelSize = ImGui.CalcTextSize(label);
+        var alignY = MirageLayout.Style.SelectableTextAlign.Y;
+        var textY = textMin.Y;
+        if (alignY > 0f)
+            textY += (bb.Max.Y - padding.Y - textY - labelSize.Y) * alignY;
+        if (icon != FontAwesomeIcon.None && icon != FontAwesomeIcon.Circle)
+        {
+            var glyph = icon.ToIconString();
+            ImGui.PushFont(UiBuilder.IconFont);
+            var advance = ImGui.CalcTextSize(glyph);
+            var origin = MirageIconButton.IconOrigin(
+                new Vector2(cursorX, textY),
+                new Vector2(advance.X, labelSize.Y),
+                glyph);
+            ImGui.GetWindowDrawList().AddText(origin, ImGui.GetColorU32(ImGuiCol.Text), glyph);
+            ImGui.PopFont();
+            cursorX += advance.X + iconGap;
+        }
+
+        if (gameIcons is { Length: > 0 })
+        {
+            var iconBox = MathF.Max(16f, rowHeight - padding.Y * 2f);
+            var draw = ImGui.GetWindowDrawList();
+            foreach (var iconId in gameIcons)
+            {
+                if (!TryDrawGameIcon(draw, iconId, new Vector2(cursorX, bb.Min.Y + (bb.GetHeight() - iconBox) * 0.5f), iconBox))
+                    continue;
+
+                cursorX += iconBox + iconGap;
+            }
+        }
+
+        textMin.X = MathF.Max(textMin.X, cursorX);
+
         var pushedText = false;
         if (labelColor is { } tint)
         {
@@ -66,7 +106,7 @@ internal static class ListSelectable
         }
 
         ImGuiP.RenderTextClipped(
-            bb.Min + padding,
+            textMin,
             bb.Max - padding,
             label,
             Vector2.Zero,
@@ -78,12 +118,17 @@ internal static class ListSelectable
         return pressed;
     }
 
-    internal static bool DrawFolderHeader(
+    internal readonly record struct FolderHeaderAction(bool Toggle, bool Select);
+
+    internal static FolderHeaderAction DrawFolderHeader(
         string label,
         bool expanded,
         float rowHeight,
         bool canCollapse = true,
-        float trailingWidth = 0f)
+        float trailingWidth = 0f,
+        bool selected = false,
+        bool selectable = false,
+        uint gameIconId = 0)
     {
         var window = ImGuiP.GetCurrentWindow();
         var id = window.GetID("##Folder"u8);
@@ -95,32 +140,63 @@ internal static class ListSelectable
         var bb = new ImRect(innerStartScreenPos, endPos);
         ImGuiP.ItemSize(new Vector2(bb.GetWidth(), rowHeight));
         if (!ImGuiP.ItemAdd(bb, id))
-            return false;
+            return default;
+
+        var padding = MirageLayout.Style.FramePadding;
+        var iconGap = MirageLayout.Style.ItemInnerSpacing.X;
+        IDalamudTextureWrap? gameTexture = null;
+        var gameIcon = gameIconId != 0 && MirageUi.TryGetGameIcon(gameIconId, out gameTexture);
+        var iconBox = MathF.Max(16f, rowHeight - padding.Y * 2f);
+        string? iconText = null;
+        Vector2 iconSize;
+        if (gameIcon)
+            iconSize = new Vector2(iconBox, iconBox);
+        else
+        {
+            var icon = expanded ? FontAwesomeIcon.FolderOpen : FontAwesomeIcon.Folder;
+            ImGui.PushFont(UiBuilder.IconFont);
+            iconText = icon.ToIconString();
+            iconSize = ImGui.CalcTextSize(iconText);
+            ImGui.PopFont();
+        }
+
+        var iconEnd = bb.Min.X + padding.X + iconSize.X + iconGap;
 
         var hovered = false;
         var held = false;
         var pressed = false;
-        if (canCollapse)
+        if (canCollapse || selectable)
         {
             pressed = ImGuiP.ButtonBehavior(bb, id, ref hovered, ref held, ImGuiButtonFlags.None);
             if (pressed)
                 ImGuiP.MarkItemEdited(id);
 
-            if (hovered)
+            if (hovered || selected)
             {
-                var col = ImGui.GetColorU32((held && hovered) ? ImGuiCol.HeaderActive : ImGuiCol.HeaderHovered);
+                var col = ImGui.GetColorU32(
+                    held && hovered ? ImGuiCol.HeaderActive
+                    : hovered ? ImGuiCol.HeaderHovered
+                    : ImGuiCol.Header);
                 ImGuiP.RenderFrame(bb.Min, bb.Max, col, false, 3.0f);
             }
         }
 
-        var padding = MirageLayout.Style.FramePadding;
-        var iconGap = MirageLayout.Style.ItemInnerSpacing.X;
-        var icon = expanded ? FontAwesomeIcon.FolderOpen : FontAwesomeIcon.Folder;
-
-        ImGui.PushFont(UiBuilder.IconFont);
-        var iconText = icon.ToIconString();
-        var iconSize = ImGui.CalcTextSize(iconText);
-        ImGui.PopFont();
+        var toggle = false;
+        var select = false;
+        if (pressed)
+        {
+            var onIcon = canCollapse && ImGui.GetMousePos().X < iconEnd;
+            if (selectable && !onIcon)
+            {
+                select = true;
+                if (canCollapse && !expanded)
+                    toggle = true;
+            }
+            else if (canCollapse)
+            {
+                toggle = true;
+            }
+        }
 
         var labelSize = ImGui.CalcTextSize(label);
         var textColor = ImGui.GetColorU32(ImGuiCol.Text);
@@ -132,12 +208,26 @@ internal static class ListSelectable
             iconPos.X + iconSize.X + iconGap,
             bb.Min.Y + (bb.GetHeight() - labelSize.Y) * 0.5f);
 
-        ImGui.PushFont(UiBuilder.IconFont);
-        dl.AddText(iconPos, textColor, iconText);
-        ImGui.PopFont();
+        if (gameIcon)
+            dl.AddImage(gameTexture!.Handle, iconPos, iconPos + iconSize);
+        else
+        {
+            ImGui.PushFont(UiBuilder.IconFont);
+            dl.AddText(iconPos, textColor, iconText!);
+            ImGui.PopFont();
+        }
 
         dl.AddText(labelPos, textColor, label);
-        return pressed;
+        return new FolderHeaderAction(toggle, select);
+    }
+
+    private static bool TryDrawGameIcon(ImDrawListPtr draw, uint iconId, Vector2 pos, float size)
+    {
+        if (iconId == 0 || !MirageUi.TryGetGameIcon(iconId, out var texture))
+            return false;
+
+        draw.AddImage(texture.Handle, pos, pos + new Vector2(size, size));
+        return true;
     }
 
     internal static bool DrawRunButton(ref bool isRunning, MirageTwoColumnRunBinding run, float size)
